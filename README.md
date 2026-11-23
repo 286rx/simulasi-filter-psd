@@ -122,4 +122,4 @@ Setelah Anda mem-push repositori ini ke GitHub:
 ---
 
 ## 👨‍💻 Pengembang
-Proyek ini dikembangkan untuk penyelesaian tugas besar mata kuliah **Pemrosesan Sinyal Digital (PSD) — Program Studi S1 Teknik Elektro**.
+Proyek ini dikembangkan untuk penyelesaian tugas besar mata kuliah **Pemrosesan Sinyal Digital (PSD) - Program Studi S1 Teknik Elektro**.
