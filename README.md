@@ -110,6 +110,48 @@ Gunakan panduan berikut saat Anda mencoba memutar audio dan menggeser kontrol-ko
 
 ---
 
+## 🎯 Panduan Praktis Kasus Nyata: Kapan Harus Memilih Apa?
+
+Bagian ini menyajikan acuan praktis rekayasa sinyal (*engineering rule-of-thumb*) untuk menentukan arsitektur filter, mode frekuensi, dan nilai cutoff yang tepat sesuai skenario nyata:
+
+### 1. Kapan Harus Menggunakan FIR vs IIR?
+
+| Kondisi Kasus Nyata | Rekomendasi Arsitektur | Alasan Rekayasa Sinyal (PSD) |
+|:---|:---:|:---|
+| **Restorasi Audio & Vokal Berkualitas Tinggi (Podcast, Musik, Studio)** | **FIR** | Memiliki **fasa linear sempurna** ($\tau = \text{konstan}$). Bentuk gelombang artikulasi wicara dan harmonik nada tidak akan melesek (*zero phase distortion*). |
+| **Sistem Wajib Stabil Mutlak Tanpa Risiko Gagal (Safety-Critical)** | **FIR** | Sistem non-rekursif (*all-zero*). Semua kutub berada di $z = 0$, sehingga mustahil berosilasi liar atau meledak menjadi nilai tak terhingga. |
+| **Perangkat Tertanam Hemat Daya (Mikrokontroler, DSP Chip, IoT, ESP32)** | **IIR** | **Sangat hemat memori & siklus clock CPU**. Hanya butuh 4–8 koefisien (orde 4) untuk menghasilkan potongan frekuensi yang setara dengan FIR 81 taps. |
+| **Aplikasi Real-Time dengan Toleransi Delay Sangat Rendah (< 5 ms)** | **IIR** | Filter IIR tidak memerlukan antrean buffer taps yang panjang, sehingga jeda waktu tunda pemrosesan (*latency*) jauh lebih minim dibanding FIR. |
+
+---
+
+### 2. Kapan Harus Menggunakan BPF, LPF, atau HPF?
+
+* 🎙️ **Gunakan Band-Pass Filter (BPF):**
+  * **Kapan:** Saat merekam suara pembicara (podcast, seminar, telepon) di ruangan nyata yang memiliki **gangguan ganda** sekaligus di frekuensi bawah dan frekuensi atas.
+  * **Contoh Kasus:** Ruangan ber-AC yang memiliki dengung motor listrik di frekuensi bawah ($< 150\text{ Hz}$) sekaligus suara desis tiupan angin atau kipas laptop di frekuensi atas ($> 3.500\text{ Hz}$). BPF membuang keduanya dalam satu langkah pemfilteran.
+* 🔇 **Gunakan Low-Pass Filter (LPF):**
+  * **Kapan:** Saat gangguan derau hanya terkonsentrasi pada **frekuensi tinggi (treble)**.
+  * **Contoh Kasus:** Menghilangkan desis gesekan mikrofon (*hiss*), bunyi dengkingan tajam (*feedback whistle* $4.500\text{ Hz}$), atau derau putih acak (*White Gaussian Noise*) dari rangkaian audio analog.
+* 💨 **Gunakan High-Pass Filter (HPF):**
+  * **Kapan:** Saat gangguan derau hanya terkonsentrasi pada **frekuensi rendah (bass/gemuruh)**.
+  * **Contoh Kasus:** Menghilangkan suara dengung transformator jala-jala listrik PLN ($50\text{ Hz} / 60\text{ Hz} / 120\text{ Hz}$), suara hembusan nafas mendadak pada mikrofon (*pop noise*), atau getaran meja akibat hentakan mengetik keyboard laptop.
+
+---
+
+### 3. Panduan Angka Frekuensi Cutoff ($f_c$): Mengatur Cutoff Setinggi / Serendah Ini untuk Apa?
+
+| Rentang Frekuensi Cutoff | Mode Filter | Tujuan & Efek Nyata pada Suara |
+|:---|:---:|:---|
+| **$100\text{ Hz} - 200\text{ Hz}$** | **HPF** | **Standar Industri Vocal Rumble Filter.** Memotong dengung jala-jala listrik PLN ($50\text{ Hz}/120\text{ Hz}$) dan getaran meja tanpa memotong nada dasar (*fundamental frequency*) suara dada vokal pria. |
+| **$300\text{ Hz} - 500\text{ Hz}$** | **HPF / BPF Low** | **Pembersih Dengung Berat Ruangan.** Digunakan jika ruangan sangat bergema di frekuensi rendah. *Catatan:* Jika batas bawah dinaikkan di atas $500\text{ Hz}$, suara vokal pria akan mulai terdengar tipis dan cempreng karena kehilangan ketebalan vokal (*body*). |
+| **$1.000\text{ Hz} - 1.500\text{ Hz}$** | **LPF** | **Efek Komunikasi Radio AM / Walkie-Talkie.** Memangkas seluruh nada tinggi, menghasilkan karakter suara sengau terbatas seperti suara HT polisi atau telepon kuno masa lalu. |
+| **$3.000\text{ Hz} - 3.500\text{ Hz}$** ⭐ | **LPF / BPF High** | **Titik Manis Rekomendasi Vokal (Standar Telekomunikasi ITU-T G.711).** Menjamin 100% konsonan artikulasi vokal ('s', 't', 'k', 'p') terdengar jelas, tetapi memotong habis seluruh desis udara dan dengkingan tajam di atas $3.500\text{ Hz}$. |
+| **$4.500\text{ Hz} - 5.000\text{ Hz}$** | **LPF** | **Penyaring Dengkingan / Whistle.** Menghilangkan nada feedback tajam (misal nada uji $4.500\text{ Hz}$) sambil tetap mempertahankan kesan udara (*airy/crisp treble*) pada vokal berkualitas studio. |
+| **$7.000\text{ Hz} - 8.000\text{ Hz}$** | **LPF** | **Batas Maksimum Pita Nyquist ($F_s/2$).** Digunakan saat ingin meloloskan seluruh spektrum frekuensi audio secara utuh (*Full Bandwidth Hi-Fi*), hanya membuang derau ultrasonik di luar jangkauan pendengaran manusia normal. |
+
+---
+
 ## 🔬 Teori & Formula Matematis Sinyal
 
 ### 1. Signal-to-Noise Ratio (SNR)
