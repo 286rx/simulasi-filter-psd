@@ -57,39 +57,56 @@ simulasi-filter-psd/
 
 ---
 
-## 🕹️ Panduan Eksplorasi: Peta Kontrol Sebab-Akibat (Audio & Visual)
+## 🕹️ BAGIAN: PETA KONTROL SEBAB-AKIBAT (Apa yang Terjadi Jika...)
 
-Tabel di bawah merangkum respons fisik audio di telinga (*auditory response*) dan respons visual pada spektrum frekuensi FFT saat pengguna mengoperasikan kontrol pada web simulasi:
-
-### 1. Tombol Preset Cepat (Quick Presets)
-
-| Preset Cepat | Efek pada Suara di Telinga | Efek pada Spektrum Frekuensi FFT | Logika Rekayasa Sinyal (PSD) |
-|:---|:---|:---|:---|
-| **[🎙️ Bersihkan Vokal (BPF)]** | Dengung berat (*hum*) dan desis tajam (*hiss*) hilang bersamaan. Artikulasi vokal terdengar fokus, jernih, dan renyah. | Jendela hijau transparan (*Passband*) membuka di tengah: **150 – 3.500 Hz**. Semua puncak derau di luar jendela hijau dipangkas rata ke dasar grafik. | Menggunakan **Band-Pass Filter** (BPF) untuk mengisolasi area frekuensi penting wicara manusia (*formant frequencies*). |
-| **[🔇 Potong Desis (LPF)]** | Suara nada dengkingan tajam (*high-pitch whistle*) atau suara keresek desis hilang. Suara vokal terasa lebih empuk dan tebal (*warm*). | Area hijau lolos dari **0 – 3.000 Hz**. Komponen frekuensi di atas 3.000 Hz langsung rontok dan diredam hingga $-60\text{ dB}$. | Menggunakan **Low-Pass Filter** (LPF) untuk menekan noise frekuensi tinggi seperti derau termal mikrofon atau desis kipas laptop. |
-| **[💨 Potong Dengung (HPF)]** | Getaran bass rendah yang membuat speaker bergetar/berdengung lenyap. Vokal terdengar lebih enteng dan bebas dengung. | Area hijau memotong frekuensi bawah (hanya lolos **200 – 8.000 Hz**). Sisi paling kiri spektrum FFT dibabat habis. | Menggunakan **High-Pass Filter** (HPF) untuk menyingkirkan interferensi harmonik jala-jala listrik PLN 50/120 Hz (*ground loop hum*). |
+Gunakan panduan berikut saat Anda mencoba memutar audio dan menggeser kontrol-kontrol di web simulasi:
 
 ---
 
-### 2. Slider Frekuensi Cutoff ($f_c$) & Taps Orde FIR
+### 1. Tombol Preset Cepat (Paling Asyik Dipencet Pertama Kali)
 
-| Parameter | Tindakan pada Slider | Yang Terjadi pada Suara & Spektrum FFT | Makna Fisis & Rekomendasi |
+| Tombol Preset | Yang Terjadi pada Suara di Telinga | Yang Terjadi pada Grafik FFT | Penjelasan Logika PSD |
 |:---|:---|:---|:---|
-| **Frekuensi Cutoff ($f_c$)** | Digeser ke **Kiri** (frekuensi rendah, misal 400 Hz) | Suara vokal terdengar semakin mendem/tenggelam seperti berbicara di balik bantal tebal atau di dalam air. Garis batas lolos menyempit ke kiri. | Komponen frekuensi vokal penting ikut terbuang jika cutoff dipasang terlalu rendah. |
-| **Frekuensi Cutoff ($f_c$)** | Digeser ke **Kanan** (frekuensi tinggi, misal 5.000 Hz) | Vokal terdengar jernih dan terbuka, namun jika terdapat desis/dengkingan pada frekuensi tinggi, noisenya mulai terdengar tembus kembali. | Penggeseran dilakukan untuk mencari titik temu optimal (*sweet spot*), idealnya pada kisaran **3.000 – 3.500 Hz**. |
-| **Jumlah Taps FIR ($M$)** | Taps **Rendah** (15 – 21 Taps) | Lereng transisi filter melandai perlahan. Masih ada sedikit residu noise yang bocor di sekitar frekuensi batas cutoff. | Beban komputasi konvolusi sangat ringan, namun selektivitas pemotongan frekuensi kurang tajam. |
-| **Jumlah Taps FIR ($M$)** | Taps **Tinggi** (61 – 81 Taps) | Lereng transisi filter menjadi **sangat tegak seperti dinding jurang**. Noise di pita henti diredam total dan bersih sempurna. | Memberikan atenuasi pita henti maksimum dengan konsekuensi delay waktu konstan bertambah sedikit ($\tau = \frac{M-1}{2}$ sampel). |
+| **[🎙️ Bersihkan Vokal (BPF)]** | Dengung berat ("hmmm") dan desis tajam ("ssshhh") hilang bersamaan. Suara vokal jadi fokus, jernih seperti rekaman penyiar radio. | Area hijau transparan (*Passband*) membuka jendela tengah: **150 – 3.500 Hz**. Semua grafik merah di luar jendela hijau dipangkas rata ke bawah. | Menggunakan **Band-Pass Filter**. Hanya meloloskan rentang frekuensi vokal manusia normal. |
+| **[🔇 Potong Desis (LPF)]** | Suara dengkingan nyaring melengking atau suara desis hilang. Suara vokal terasa lebih empuk dan tebal (*warm*). | Area hijau menutup frekuensi atas (hanya meloloskan **0 – 3.000 Hz**). Garis biru di atas 3.000 Hz langsung rontok ke dasar grafik. | Menggunakan **Low-Pass Filter**. Memotong komponen frekuensi tinggi yang biasanya menjadi sarang noise desis kipas laptop. |
+| **[💨 Potong Dengung (HPF)]** | Suara getaran bass rendah yang bikin speaker berdengung lenyap seketika. Vokal terdengar lebih enteng dan kering. | Area hijau memotong frekuensi bawah (hanya meloloskan **200 – 8.000 Hz**). Sisi paling kiri grafik drop ke $-60\text{ dB}$. | Menggunakan **High-Pass Filter**. Menyingkirkan getaran listrik PLN 50/120 Hz atau getaran meja. |
 
 ---
 
-### 3. Pemilihan Arsitektur: FIR vs IIR
+### 2. Slider Frekuensi Cutoff ($f_c$) — Mainkan Saat Audio Sedang Nyala!
 
-| Parameter Pembanding | Filter FIR (Linear Phase) | Filter IIR (Butterworth Orde-4) |
-|:---|:---|:---|
-| **Respon Fasa $\angle H(\omega)$** | **Garis lurus murni** ($\angle H(\omega) = -\alpha \omega$). Semua frekuensi tertunda dengan waktu yang sama persis $\rightarrow$ **Bebas distorsi fasa (*zero phase dispersion*)**. | **Melengkung tajam** di sekitar cutoff $\rightarrow$ Frekuensi tinggi mengalami delay lebih lama daripada frekuensi rendah. |
-| **Stabilitas Bidang Z** | Seluruh kutub (*poles* $\times$) bertumpuk di titik pusat origin $z = 0$ $\rightarrow$ **100% Stabil Mutlak (*Unconditionally Stable*)**. | 4 buah kutub konjugat berada aman di dalam lingkaran satuan ($|z| \approx 0,75 < 1$) $\rightarrow$ **Stabil BIBO**. |
-| **Beban Komputasi** | Membutuhkan banyak koefisien/taps (misal 41–81 taps) untuk lereng curam (non-rekursif). | Sangat hemat perhitungan; hanya membutuhkan orde ke-4 untuk lereng transisi yang tajam (rekursif). |
-| **Penerapan Ideal** | Restorasi rekaman vokal studio, instrumen musik, dan aplikasi transmisi audio fidelitas tinggi. | Perangkat mikrokontroler hemat daya/DSP berprosesor terbatas yang membutuhkan filter tajam dan cepat. |
+*(Centang kotak **"Loop Terus"**, klik **[▶ 3. Filter]**, lalu geser-geser slider cutoff)*
+
+* **Jika digeser ke KIRI (ke frekuensi rendah, misal 400 Hz):**
+  * **Efek Suara:** Suara Anda makin lama makin mendem dan tenggelam, seperti sedang berbicara di dalam air atau di balik bantal tebal.
+  * **Efek Visual:** Garis batas hijau menyempit ke arah kiri.
+* **Jika digeser ke KANAN (ke frekuensi tinggi, misal 5.000 Hz):**
+  * **Efek Suara:** Vokal Anda terdengar jernih dan terbuka kembali, **TAPI** kalau ada suara desis noise di frekuensi tersebut, noisenya mulai terdengar bocor masuk lagi.
+* **Fungsi Utama:** Menemukan titik temu (*sweet spot*) di mana vokal sudah terdengar jelas, tetapi gangguan noisenya belum sempat masuk (biasanya di kisaran **3.000 – 3.500 Hz**).
+
+---
+
+### 3. Slider Taps Orde FIR ($M$) (misal: 15 s/d 81 Taps)
+
+* **Jika Taps KECIL (15 – 21 Taps):**
+  * **Efek Grafik:** Lereng penurunan filternya melandai pelan. Masih ada sedikit noise yang bocor di dekat frekuensi cutoff.
+  * **Keuntungan:** Komputasinya sangat ringan.
+* **Jika Taps BESAR (61 – 81 Taps):**
+  * **Efek Grafik:** Lereng penurunan filter menjadi **sangat tegak seperti dinding jurang**. Pemotongan noise sangat tegas dan bersih sempurna.
+  * **Konsekuensi:** Jeda waktu delay konstan filternya bertambah sedikit ($\tau = \frac{M-1}{2}$ sampel).
+
+---
+
+### 4. Pilihan Arsitektur: FIR vs IIR (Pertanyaan Wajib Dosen)
+
+* **Tombol FIR (Linear Phase):**
+  * **Pada tab Respon Fasa:** Grafiknya berupa **GARIS LURUS MIRING SEMPURNA** ($\angle H(\omega) = -\alpha \omega$).
+  * **Pada tab Bidang Z:** Semua tanda silang kutub ($\times$) berkumpul di titik pusat origin $(0,0)$.
+  * **Intinya:** FIR tidak membuat suara vokal terdengar aneh (*bebas distorsi fasa*), dan dijamin 100% stabil mutlak (*unconditionally stable*).
+* **Tombol IIR (Butterworth):**
+  * **Pada tab Respon Fasa:** Grafiknya **MELENGKUNG TAJAM** di sekitar frekuensi cutoff (*phase dispersion*).
+  * **Pada tab Bidang Z:** Kutub menyebar menjadi 4 titik konjugat, tapi masih berada **DI DALAM LINGKARAN SATUAN ($|z| < 1$)**.
+  * **Intinya:** IIR lebih hemat komputasi dan potongannya tajam pada orde rendah, serta tetap stabil karena semua kutub ada di dalam lingkaran satuan.
 
 ---
 
