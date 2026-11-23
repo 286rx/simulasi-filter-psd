@@ -57,6 +57,42 @@ simulasi-filter-psd/
 
 ---
 
+## 🕹️ Panduan Eksplorasi: Peta Kontrol Sebab-Akibat (Audio & Visual)
+
+Tabel di bawah merangkum respons fisik audio di telinga (*auditory response*) dan respons visual pada spektrum frekuensi FFT saat pengguna mengoperasikan kontrol pada web simulasi:
+
+### 1. Tombol Preset Cepat (Quick Presets)
+
+| Preset Cepat | Efek pada Suara di Telinga | Efek pada Spektrum Frekuensi FFT | Logika Rekayasa Sinyal (PSD) |
+|:---|:---|:---|:---|
+| **[🎙️ Bersihkan Vokal (BPF)]** | Dengung berat (*hum*) dan desis tajam (*hiss*) hilang bersamaan. Artikulasi vokal terdengar fokus, jernih, dan renyah. | Jendela hijau transparan (*Passband*) membuka di tengah: **150 – 3.500 Hz**. Semua puncak derau di luar jendela hijau dipangkas rata ke dasar grafik. | Menggunakan **Band-Pass Filter** (BPF) untuk mengisolasi area frekuensi penting wicara manusia (*formant frequencies*). |
+| **[🔇 Potong Desis (LPF)]** | Suara nada dengkingan tajam (*high-pitch whistle*) atau suara keresek desis hilang. Suara vokal terasa lebih empuk dan tebal (*warm*). | Area hijau lolos dari **0 – 3.000 Hz**. Komponen frekuensi di atas 3.000 Hz langsung rontok dan diredam hingga $-60\text{ dB}$. | Menggunakan **Low-Pass Filter** (LPF) untuk menekan noise frekuensi tinggi seperti derau termal mikrofon atau desis kipas laptop. |
+| **[💨 Potong Dengung (HPF)]** | Getaran bass rendah yang membuat speaker bergetar/berdengung lenyap. Vokal terdengar lebih enteng dan bebas dengung. | Area hijau memotong frekuensi bawah (hanya lolos **200 – 8.000 Hz**). Sisi paling kiri spektrum FFT dibabat habis. | Menggunakan **High-Pass Filter** (HPF) untuk menyingkirkan interferensi harmonik jala-jala listrik PLN 50/120 Hz (*ground loop hum*). |
+
+---
+
+### 2. Slider Frekuensi Cutoff ($f_c$) & Taps Orde FIR
+
+| Parameter | Tindakan pada Slider | Yang Terjadi pada Suara & Spektrum FFT | Makna Fisis & Rekomendasi |
+|:---|:---|:---|:---|
+| **Frekuensi Cutoff ($f_c$)** | Digeser ke **Kiri** (frekuensi rendah, misal 400 Hz) | Suara vokal terdengar semakin mendem/tenggelam seperti berbicara di balik bantal tebal atau di dalam air. Garis batas lolos menyempit ke kiri. | Komponen frekuensi vokal penting ikut terbuang jika cutoff dipasang terlalu rendah. |
+| **Frekuensi Cutoff ($f_c$)** | Digeser ke **Kanan** (frekuensi tinggi, misal 5.000 Hz) | Vokal terdengar jernih dan terbuka, namun jika terdapat desis/dengkingan pada frekuensi tinggi, noisenya mulai terdengar tembus kembali. | Penggeseran dilakukan untuk mencari titik temu optimal (*sweet spot*), idealnya pada kisaran **3.000 – 3.500 Hz**. |
+| **Jumlah Taps FIR ($M$)** | Taps **Rendah** (15 – 21 Taps) | Lereng transisi filter melandai perlahan. Masih ada sedikit residu noise yang bocor di sekitar frekuensi batas cutoff. | Beban komputasi konvolusi sangat ringan, namun selektivitas pemotongan frekuensi kurang tajam. |
+| **Jumlah Taps FIR ($M$)** | Taps **Tinggi** (61 – 81 Taps) | Lereng transisi filter menjadi **sangat tegak seperti dinding jurang**. Noise di pita henti diredam total dan bersih sempurna. | Memberikan atenuasi pita henti maksimum dengan konsekuensi delay waktu konstan bertambah sedikit ($\tau = \frac{M-1}{2}$ sampel). |
+
+---
+
+### 3. Pemilihan Arsitektur: FIR vs IIR
+
+| Parameter Pembanding | Filter FIR (Linear Phase) | Filter IIR (Butterworth Orde-4) |
+|:---|:---|:---|
+| **Respon Fasa $\angle H(\omega)$** | **Garis lurus murni** ($\angle H(\omega) = -\alpha \omega$). Semua frekuensi tertunda dengan waktu yang sama persis $\rightarrow$ **Bebas distorsi fasa (*zero phase dispersion*)**. | **Melengkung tajam** di sekitar cutoff $\rightarrow$ Frekuensi tinggi mengalami delay lebih lama daripada frekuensi rendah. |
+| **Stabilitas Bidang Z** | Seluruh kutub (*poles* $\times$) bertumpuk di titik pusat origin $z = 0$ $\rightarrow$ **100% Stabil Mutlak (*Unconditionally Stable*)**. | 4 buah kutub konjugat berada aman di dalam lingkaran satuan ($|z| \approx 0,75 < 1$) $\rightarrow$ **Stabil BIBO**. |
+| **Beban Komputasi** | Membutuhkan banyak koefisien/taps (misal 41–81 taps) untuk lereng curam (non-rekursif). | Sangat hemat perhitungan; hanya membutuhkan orde ke-4 untuk lereng transisi yang tajam (rekursif). |
+| **Penerapan Ideal** | Restorasi rekaman vokal studio, instrumen musik, dan aplikasi transmisi audio fidelitas tinggi. | Perangkat mikrokontroler hemat daya/DSP berprosesor terbatas yang membutuhkan filter tajam dan cepat. |
+
+---
+
 ## 🔬 Teori & Formula Matematis Sinyal
 
 ### 1. Signal-to-Noise Ratio (SNR)
