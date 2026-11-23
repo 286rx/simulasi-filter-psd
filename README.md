@@ -8,7 +8,7 @@
 
 Proyek ini merupakan instrumen simulasi dan evaluasi komputasi untuk mata kuliah **Pemrosesan Sinyal Digital (PSD) - S1 Teknik Elektro**. Proyek mengkaji efektivitas peredaman derau (*noise reduction*) pada sinyal suara menggunakan filter digital **Finite Impulse Response (FIR)** berfasa linear dan **Infinite Impulse Response (IIR - Butterworth)**.
 
-🔗 **Akses Langsung Simulasi Interaktif:** [https://286rx.github.io/simulasi-filter-psd/](https://286rx.github.io/simulasi-filter-psd/)
+🔗 **Akses Langsung Simulasi Interaktif:** [https://simulasipsd.netlify.app/)
 
 ---
 
