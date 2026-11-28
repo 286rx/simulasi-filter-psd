@@ -1,1610 +1,1340 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Simulasi Filter Audio Interaktif Real-Time (Live DSP)</title>
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
-  <style>
-    .preset-pill {
-      padding: 0.375rem 0.75rem;
-      border-radius: 0.5rem;
-      font-size: 0.75rem;
-      font-weight: 500;
-      border: 1px solid var(--border, #334155);
-      color: var(--muted-foreground, #94a3b8);
-      background-color: transparent;
-      cursor: pointer;
-      transition: all 0.15s ease-in-out;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-    .preset-pill:hover {
-      color: var(--foreground, #ffffff);
-      background-color: rgba(255, 255, 255, 0.08);
-    }
-    .preset-pill.active {
-      background-color: #10b981 !important;
-      color: #ffffff !important;
-      border-color: #10b981 !important;
-      font-weight: 700 !important;
-      box-shadow: 0 1px 4px rgba(16, 185, 129, 0.4) !important;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab DSP: Filter Digital Audio FIR & IIR (Real-Time)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎛️</text></svg>">
+<meta name="description" content="Simulasi interaktif reduksi noise audio dengan filter digital FIR dan IIR (Butterworth) secara real-time. Tugas Pemrosesan Sinyal Digital.">
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --fg: #0f172a; --muted: #5b6474; --border: #e2e7ef; --soft: #f1f4f8;
+    --grid: rgba(15, 23, 42, .07); --axis: #6b7280;
+    --clean: #059669; --noisy: #dc2626; --filt: #2563eb; --iir: #d97706; --fir: #2563eb;
+    --pass: rgba(5, 150, 105, .10); --accent: #059669; --purple: #7c3aed; --amber: #d97706;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 4px 14px rgba(15, 23, 42, .04);
+    --radius: 14px;
+  }
+  [data-theme="dark"] {
+    --bg: #0b1020; --card: #121a2e; --fg: #e7ecf5; --muted: #95a1b9; --border: #24304a; --soft: #182238;
+    --grid: rgba(231, 236, 245, .08); --axis: #8f9bb3;
+    --clean: #34d399; --noisy: #f87171; --filt: #60a5fa; --iir: #fbbf24; --fir: #60a5fa;
+    --pass: rgba(52, 211, 153, .12); --accent: #34d399; --purple: #a78bfa; --amber: #fbbf24;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+  h3 { font-size: 13.5px; margin: 0; font-weight: 650; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  button { font: inherit; color: inherit; }
+
+  /* Header */
+  .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; align-items: flex-start; padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .top .sub { margin-top: 3px; color: var(--muted); font-size: 13px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); cursor: pointer; font-size: 12.5px; font-weight: 550; transition: background .15s, border-color .15s, transform .05s; }
+  .btn:hover { background: var(--soft); }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.05); }
+
+  /* Preset toolbar */
+  .presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .presets .lbl { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 2px; }
+  .pill { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); cursor: pointer; font-size: 12.5px; font-weight: 550; color: var(--muted); transition: all .15s; }
+  .pill:hover { color: var(--fg); }
+  .pill.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 650; }
+  .pill-note { font-size: 12px; color: var(--muted); }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .metric { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); }
+  .metric .k { font-size: 12px; color: var(--muted); }
+  .metric .v { font-size: 18px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .metric .s { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .card-head .desc { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .new { font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--purple) 15%, transparent); color: var(--purple); vertical-align: 1px; margin-left: 4px; }
+
+  /* Controls */
+  .seg { display: grid; gap: 6px; }
+  .seg.c2 { grid-template-columns: repeat(2, 1fr); }
+  .seg.c3 { grid-template-columns: repeat(3, 1fr); }
+  .seg button { padding: 7px 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--soft); cursor: pointer; font-size: 12.5px; font-weight: 550; color: var(--muted); transition: all .15s; }
+  .seg button:hover { color: var(--fg); }
+  .seg button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 700; }
+  .field { margin-top: 12px; }
+  .field > .row { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 3px; }
+  .field > .row b { font-variant-numeric: tabular-nums; }
+  .lbl2 { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+  select { width: 100%; padding: 7px 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--soft); color: var(--fg); font: inherit; font-size: 12.5px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; user-select: none; }
+  .toggle input { accent-color: var(--noisy); width: 15px; height: 15px; }
+  .disabled { opacity: .4; pointer-events: none; }
+  .note { font-size: 12px; padding: 8px 10px; border-radius: 9px; background: var(--soft); color: var(--muted); margin-top: 10px; }
+  .note.warn { background: color-mix(in srgb, var(--amber) 12%, transparent); color: var(--fg); }
+  .note.ok { background: color-mix(in srgb, var(--clean) 12%, transparent); color: var(--fg); }
+  .hidden { display: none !important; }
+
+  /* Player */
+  .play { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .play button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 10px 4px; border-radius: 11px; cursor: pointer; font-size: 12.5px; font-weight: 700; border: 1.5px solid; transition: all .15s; }
+  .play button .ic { font-size: 15px; line-height: 1; }
+  .play button .sm { font-size: 11px; font-weight: 500; opacity: .8; }
+  .play .p-clean { color: var(--clean); border-color: color-mix(in srgb, var(--clean) 45%, transparent); background: color-mix(in srgb, var(--clean) 8%, transparent); }
+  .play .p-noisy { color: var(--noisy); border-color: color-mix(in srgb, var(--noisy) 45%, transparent); background: color-mix(in srgb, var(--noisy) 8%, transparent); }
+  .play .p-filt { color: var(--filt); border-color: color-mix(in srgb, var(--filt) 45%, transparent); background: color-mix(in srgb, var(--filt) 8%, transparent); }
+  .play button.on { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 30%, transparent); transform: translateY(-1px); }
+  .playbar { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; }
+  .linkbtn { background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 600; padding: 0; }
+  .linkbtn:hover { color: var(--noisy); }
+  .status.on { color: var(--filt); font-weight: 700; }
+
+  /* Source */
+  .src { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .src button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--soft); cursor: pointer; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .src button.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .rec { width: 100%; margin-top: 10px; padding: 10px; border-radius: 11px; border: 0; cursor: pointer; background: var(--noisy); color: #fff; font-weight: 700; font-size: 12.5px; }
+  .rec:disabled { opacity: .6; cursor: wait; }
+  .drop { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 10px; padding: 14px 10px; border: 1.5px dashed var(--border); border-radius: 11px; cursor: pointer; text-align: center; font-size: 12px; }
+  .drop:hover { border-color: var(--filt); }
+
+  /* Stats grid (taps) */
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 10px; }
+  .stat { background: var(--soft); border-radius: 9px; padding: 6px 9px; }
+  .stat .k { font-size: 11px; color: var(--muted); }
+  .stat .v { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Charts */
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .sw { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  .sw.dash { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px) !important; height: 2px; }
+  .chart { position: relative; height: 210px; border-radius: 10px; background: var(--soft); border: 1px solid var(--border); overflow: hidden; }
+  .chart.tall { height: 270px; }
+  .chart canvas { width: 100%; height: 100%; display: block; }
+  .chart .empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; font-size: 12.5px; color: var(--muted); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .caption { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .caption b { color: var(--fg); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tabs button { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 12px; font-weight: 550; color: var(--muted); }
+  .tabs button.on { background: var(--purple); border-color: var(--purple); color: #fff; font-weight: 650; }
+  .explain { font-size: 12.5px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--purple) 7%, transparent); border: 1px solid color-mix(in srgb, var(--purple) 22%, transparent); margin-top: 10px; line-height: 1.55; }
+
+  /* Table */
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.cmp th, table.cmp td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  table.cmp th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  table.cmp td:first-child { color: var(--muted); width: 26%; }
+  table.cmp .act { background: color-mix(in srgb, var(--accent) 9%, transparent); font-weight: 650; }
+  table.cmp tr:last-child td { border-bottom: 0; }
+  .good { color: var(--clean); font-weight: 650; }
+
+  .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 22px; }
+  kbd { font: 11px ui-monospace, monospace; padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: var(--card); }
+
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } .wrap { padding: 12px; } h1 { font-size: 18px; } }
+</style>
 </head>
-<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 md:p-6 min-h-screen">
+<body>
+<div class="wrap">
 
-  <!-- Header Section -->
-  <header class="mb-5 border-b border-[var(--border)] pb-4 space-y-3">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-[var(--foreground)]">
-          Laboratorium DSP: Filter Digital Audio FIR & IIR (Real-Time)
-        </h1>
-        <p class="text-xs md:text-sm text-[var(--muted-foreground)] mt-0.5">
-          Putar audio terus-menerus dan geser slider cutoff / ubah filter — suara dan grafik langsung berubah secara instan tanpa perlu klik play berulang-ulang!
-        </p>
-      </div>
-
-      <!-- Quick Action Buttons -->
-      <div class="flex items-center gap-2">
-        <button id="btnDownloadWAV" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
-          <span>📥</span> Unduh Audio (.WAV)
-        </button>
-        <button id="btnDownloadPNG" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition-all flex items-center gap-1.5 cursor-pointer">
-          <span>📸</span> Simpan Grafik (.PNG)
-        </button>
-      </div>
+  <!-- HEADER -->
+  <header class="top">
+    <div>
+      <h1>Laboratorium DSP: Filter Digital Audio FIR &amp; IIR</h1>
+      <p class="sub">Reduksi noise pada sinyal audio secara real-time. Putar audio, lalu geser kontrol filter: suara dan grafik langsung berubah.</p>
     </div>
-
-    <!-- Preset Cepat Toolbar with Synchronized Green Highlight -->
-    <div class="flex flex-wrap items-center gap-2 bg-[var(--card)] border border-[var(--border)] p-1.5 rounded-xl text-xs w-fit">
-      <span class="text-[var(--muted-foreground)] font-semibold px-1 flex items-center gap-1">
-        <span>⚡</span> Preset Cepat:
-      </span>
-      <button id="btnPresetVoice" class="preset-pill active">
-        🎙️ Bersihkan Vokal (BPF)
-      </button>
-      <button id="btnPresetHiss" class="preset-pill">
-        🔇 Potong Desis (LPF)
-      </button>
-      <button id="btnPresetHum" class="preset-pill">
-        💨 Potong Dengung (HPF)
-      </button>
+    <div class="actions">
+      <button class="btn" id="btnTheme" title="Ganti tema terang/gelap">🌓 Tema</button>
+      <button class="btn" id="btnFull" title="Layar penuh untuk presentasi">⛶ Layar Penuh</button>
+      <button class="btn" id="btnPNG">📸 Simpan Grafik (.PNG)</button>
+      <button class="btn primary" id="btnWAV">📥 Unduh Audio (.WAV)</button>
     </div>
   </header>
 
-  <!-- METRIC BADGES -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 shadow-xs">
-      <span class="text-xs text-[var(--muted-foreground)] block">Sumber Sinyal</span>
-      <div class="flex items-baseline gap-1 mt-1">
-        <span id="metricAudioSource" class="text-base font-bold text-emerald-500">Mikrofon Sendiri</span>
-      </div>
-      <span id="metricAudioSub" class="text-xs text-[var(--muted-foreground)] block mt-0.5">Durasi: 3.0 detik (48k sampel)</span>
-    </div>
+  <!-- PRESET -->
+  <div class="presets">
+    <span class="lbl">⚡ Preset Cepat:</span>
+    <button class="pill" data-preset="voice">🎙️ Bersihkan Vokal (BPF 150–3.500 Hz)</button>
+    <button class="pill" data-preset="hiss">🔇 Potong Desis (LPF 3.000 Hz)</button>
+    <button class="pill" data-preset="hum">💨 Potong Dengung (HPF 200 Hz)</button>
+    <span class="pill-note" id="presetNote"></span>
+  </div>
 
-    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 shadow-xs">
-      <span class="text-xs text-[var(--muted-foreground)] block">Pita Frekuensi Lolos (Passband)</span>
-      <div class="flex items-baseline gap-1 mt-1">
-        <span id="metricPassband" class="text-base font-bold text-blue-500">150 – 3,500 Hz</span>
-      </div>
-      <span class="text-xs text-[var(--muted-foreground)] block mt-0.5">Rentang vokal manusia</span>
-    </div>
-
-    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 shadow-xs">
-      <span class="text-xs text-[var(--muted-foreground)] block">Peningkatan Kualitas (Gain ΔSNR)</span>
-      <div class="flex items-baseline gap-1 mt-1">
-        <span id="metricSnrGain" class="text-lg md:text-xl font-bold text-emerald-500">+14.2</span>
-        <span class="text-xs text-[var(--muted-foreground)]">dB</span>
-      </div>
-      <span class="text-xs text-[var(--muted-foreground)] block mt-0.5">Efisiensi pemotongan noise</span>
-    </div>
-
-    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 shadow-xs">
-      <span class="text-xs text-[var(--muted-foreground)] block">Karakteristik Fasa Filter</span>
-      <div class="flex items-baseline gap-1 mt-1">
-        <span id="metricPhaseType" class="text-base font-bold text-purple-500">Linear Phase</span>
-      </div>
-      <span id="metricPhaseSub" class="text-xs text-[var(--muted-foreground)] block mt-0.5">Delay konstan: (M-1)/2 sampel</span>
-    </div>
+  <!-- METRICS -->
+  <section class="metrics">
+    <div class="metric"><div class="k">Pita Lolos (Passband)</div><div class="v" id="mPass" style="color:var(--filt)">–</div><div class="s" id="mPassSub">–</div></div>
+    <div class="metric"><div class="k">Peningkatan Kualitas (ΔSNR)</div><div class="v" id="mSnr">–</div><div class="s" id="mSnrSub">–</div></div>
+    <div class="metric"><div class="k">Karakteristik Fasa &amp; Delay</div><div class="v" id="mPhase" style="color:var(--purple)">–</div><div class="s" id="mPhaseSub">–</div></div>
+    <div class="metric"><div class="k">Beban Komputasi</div><div class="v" id="mOps">–</div><div class="s" id="mOpsSub">–</div></div>
   </section>
 
-  <!-- MAIN GRID: CONTROLS & VISUALIZATION -->
-  <main class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-    
-    <!-- LEFT COLUMN: CONTROLS (4 COLS) -->
-    <div class="lg:col-span-4 space-y-4">
+  <main class="layout">
+    <!-- LEFT: CONTROLS -->
+    <div class="col">
 
-      <!-- LIVE AUDIO PLAYBACK TOOLBAR -->
-      <div class="bg-[var(--card)] border-2 border-blue-500/30 rounded-xl p-4 shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-bold flex items-center gap-1.5 text-[var(--foreground)]">
-            <span>🎧</span> Pemutar Audio Real-Time
-          </h3>
-          <!-- Looping Toggle -->
-          <label class="flex items-center gap-1.5 text-xs font-medium cursor-pointer text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
-            <input type="checkbox" id="chkLoopAudio" checked class="accent-blue-500 rounded">
-            <span>Loop Terus</span>
-          </label>
+      <div class="card">
+        <div class="card-head">
+          <h3>🎧 Pemutar Audio Real-Time</h3>
+          <label class="toggle" style="color:var(--filt)"><input type="checkbox" id="chkLoop" checked style="accent-color:var(--filt)"> Loop terus</label>
         </div>
-        <p class="text-xs text-[var(--muted-foreground)] mb-3">
-          Nyalakan audio, lalu geser-geser slider frekuensi cutoff untuk mendengar efek perubahannya secara instan:
-        </p>
-
-        <!-- 3 Playback Buttons -->
-        <div class="grid grid-cols-3 gap-2">
-          <button id="btnPlayClean" class="play-btn p-2.5 rounded-lg text-xs font-bold border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 active:scale-95 transition-all flex flex-col items-center gap-0.5 cursor-pointer">
-            <span class="text-sm">▶</span>
-            <span>1. Asli</span>
-            <span class="text-xs opacity-75 font-normal">(Clean/Mic)</span>
-          </button>
-          
-          <button id="btnPlayNoisy" class="play-btn p-2.5 rounded-lg text-xs font-bold border border-red-500/40 bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 transition-all flex flex-col items-center gap-0.5 cursor-pointer">
-            <span class="text-sm">▶</span>
-            <span>2. + Noise</span>
-            <span class="text-xs opacity-75 font-normal">(Bising)</span>
-          </button>
-
-          <button id="btnPlayFiltered" class="play-btn p-2.5 rounded-lg text-xs font-bold border-2 border-blue-500 bg-blue-500/15 text-blue-500 hover:bg-blue-500/25 active:scale-95 transition-all flex flex-col items-center gap-0.5 shadow-xs cursor-pointer">
-            <span class="text-sm">▶</span>
-            <span>3. Filter</span>
-            <span class="text-xs opacity-75 font-normal">(Bersih)</span>
-          </button>
+        <div class="play">
+          <button class="p-clean" data-track="clean"><span class="ic">▶</span>1. Asli<span class="sm">(bersih)</span></button>
+          <button class="p-noisy" data-track="noisy"><span class="ic">▶</span>2. + Noise<span class="sm">(bising)</span></button>
+          <button class="p-filt" data-track="filtered"><span class="ic">▶</span>3. Filter<span class="sm">(hasil)</span></button>
         </div>
-
-        <div class="mt-2.5 flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]">
-          <span id="metricPlayStatus">Status: ⏹ Berhenti</span>
-          <button id="btnStopAudio" class="hover:text-red-500 transition-colors cursor-pointer font-medium">
-            ⏹ Hentikan Suara
-          </button>
+        <div class="playbar">
+          <span class="status" id="playStatus">⏹ Berhenti</span>
+          <button class="linkbtn" id="btnStop">⏹ Hentikan suara</button>
         </div>
       </div>
 
-      <!-- AUDIO SOURCE CARD -->
-      <div id="cardSignalParams" class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-xs space-y-3.5 transition-all">
-        <div class="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
-          <h3 class="text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
-            <span>🎙️</span> 1. Sumber Suara (3 Detik Optimal)
-          </h3>
-          <span id="badgeSourceType" class="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-500 text-white shadow-xs">Mikrofon</span>
+      <div class="card">
+        <div class="card-head"><h3>🎙️ 1. Sumber Suara (3 detik)</h3></div>
+        <div class="src">
+          <button data-src="synth"><span>🎵</span>Sintetis</button>
+          <button data-src="mic"><span>🔴</span>Rekam Mic</button>
+          <button data-src="file"><span>📁</span>Upload File</button>
         </div>
-
-        <!-- Source Selector Buttons -->
-        <div class="grid grid-cols-3 gap-2 text-xs">
-          <button id="tabSrcMic" class="p-2 rounded-lg border-2 border-emerald-500 bg-emerald-500/15 text-emerald-500 font-bold flex flex-col items-center justify-center gap-0.5 transition-all shadow-xs cursor-pointer">
-            <span class="text-sm">🔴</span>
-            <span>Rekam Mic</span>
-          </button>
-          <button id="tabSrcFile" class="p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer">
-            <span class="text-sm">📁</span>
-            <span>Upload File</span>
-          </button>
-          <button id="tabSrcSynth" class="p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer">
-            <span class="text-sm">🎵</span>
-            <span>Sintetis</span>
-          </button>
-        </div>
-
-        <!-- Mic Record Pane -->
-        <div id="paneMic" class="space-y-2.5 pt-1">
-          <button id="btnStartRecord" class="w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-red-500 hover:bg-red-600 active:scale-98 text-white transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer">
-            <span>🔴</span>
-            <span>REKAM SUARA SAYA (3 DETIK OPTIMAL)</span>
-          </button>
-          <div id="recStatus" class="text-xs text-amber-500 font-bold text-center animate-pulse hidden">
-            🎙️ Bicaralah sekarang! (<span id="recTimer" class="text-sm">3</span>s)
-          </div>
-          <div id="recSuccessMsg" class="text-xs text-emerald-500 font-semibold p-2 bg-emerald-500/10 rounded-lg text-center hidden">
-            ✓ Suara mikrofon terekam utuh & siap disimulasikan!
-          </div>
-        </div>
-
-        <!-- File Upload Pane -->
-        <div id="paneFile" class="space-y-2 pt-1 hidden">
-          <label class="flex flex-col items-center justify-center border-2 border-dashed border-blue-500/40 hover:border-blue-500 rounded-xl p-3 cursor-pointer bg-[var(--background)] hover:bg-blue-500/5 transition-all">
-            <span class="text-xl mb-1">📂</span>
-            <span class="text-xs font-bold text-blue-500">KLIK UNTUK MEMILIH FILE AUDIO / WHATSAPP</span>
-            <span id="fileNameLabel" class="text-xs text-[var(--muted-foreground)] mt-0.5">Semua file didukung: .mp4, .m4a, .mp3, .wav, .opus, dll</span>
-            <!-- Bebas tanpa filter 'accept' agar file .mp4 WhatsApp muncul 100% di Windows Explorer -->
-            <input type="file" id="inputAudioFile" class="hidden">
-          </label>
-        </div>
-
-        <!-- Synth Pane -->
-        <div id="paneSynth" class="space-y-2 pt-1 hidden">
-          <label class="text-xs font-medium text-[var(--foreground)] block">Pola Nada Sintetis:</label>
-          <select id="selSignalType" class="w-full text-xs bg-[var(--background)] border border-[var(--border)] rounded-lg p-2 text-[var(--foreground)]">
-            <option value="speech">Simulasi Vokal Harmonik (440 Hz + 880 Hz)</option>
-            <option value="pure">Nada Murni Sinusoidal (400 Hz)</option>
-            <option value="dual">Dual Tone Bandpass Test (800 Hz + 1800 Hz)</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- NOISE INJECTION CARD -->
-      <div id="cardNoiseParams" class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-xs space-y-3 transition-all">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold flex items-center gap-1.5">
-            <span>⚡</span> 2. Injeksi Derau (Noise)
-          </h3>
-          <label class="flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
-            <input type="checkbox" id="chkEnableNoise" class="accent-red-500 rounded">
-            <span id="lblNoiseToggleText" class="text-gray-400 font-medium">Mati</span>
-          </label>
-        </div>
-
-        <div id="paneNoiseControls" class="space-y-2.5 opacity-40 pointer-events-none">
-          <div>
-            <label class="text-xs text-[var(--muted-foreground)] block mb-1">Tipe Noise Injeksi</label>
-            <select id="selNoiseType" class="w-full text-xs bg-[var(--background)] border border-[var(--border)] rounded-lg p-2 text-[var(--foreground)]">
-              <option value="highfreq">Dengkingan Tajam (4,500 Hz Sine Whistle)</option>
-              <option value="white">Additive White Gaussian Noise (Keresek Desis)</option>
-              <option value="lowfreq">Dengung Rendah Listrik / Hum (120 Hz)</option>
-              <option value="both_out">Dual Noise: Hum 120 Hz + Hiss 5,000 Hz</option>
+        <div id="paneSynth">
+          <div class="field">
+            <span class="lbl2">Pola nada sintetis</span>
+            <select id="selSynth">
+              <option value="speech">Vokal harmonik (440 Hz + 880 Hz)</option>
+              <option value="pure">Nada murni sinusoidal (400 Hz)</option>
+              <option value="dual">Dua nada uji BPF (800 Hz + 1.800 Hz)</option>
             </select>
           </div>
-
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-[var(--muted-foreground)]">Volume Noise:</span>
-              <span id="lblNoiseAmp" class="font-bold text-red-500">0.50</span>
-            </div>
-            <input id="sliderNoiseAmp" type="range" min="0.0" max="1.2" step="0.05" value="0.50" class="w-full accent-red-500 cursor-pointer">
-          </div>
         </div>
-
-        <p id="noteNoiseMic" class="text-xs text-amber-500/90 leading-tight">
-          ℹ️ <em>Saat rekam mic, noise bawaan ruangan sudah ada. Centang sakelar di atas jika ingin menambah gangguan buatan.</em>
-        </p>
-      </div>
-
-      <!-- FILTER CONTROLS -->
-      <div id="cardFilterParams" class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-xs space-y-3.5 transition-all">
-        <h3 class="text-sm font-semibold flex items-center justify-between">
-          <span>🎛️ 3. Desain Filter Digital</span>
-        </h3>
-
-        <!-- Filter Mode: BPF, LPF, HPF -->
-        <div>
-          <label class="text-xs text-[var(--muted-foreground)] block mb-1">Mode Filter Frekuensi</label>
-          <div class="grid grid-cols-3 gap-1.5 text-xs">
-            <button id="btnModeBPF" class="py-1.5 px-2 rounded-lg font-semibold border border-emerald-500 bg-emerald-500/10 text-emerald-500 transition-colors cursor-pointer">
-              Band-Pass
-            </button>
-            <button id="btnModeLPF" class="py-1.5 px-2 rounded-lg font-medium border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] transition-colors cursor-pointer">
-              Low-Pass
-            </button>
-            <button id="btnModeHPF" class="py-1.5 px-2 rounded-lg font-medium border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] transition-colors cursor-pointer">
-              High-Pass
-            </button>
-          </div>
+        <div id="paneMic" class="hidden">
+          <button class="rec" id="btnRec">🔴 REKAM SUARA SAYA (3 DETIK)</button>
+          <div class="note" id="micNote">Belum ada rekaman. Sinyal yang dipakai masih sinyal sintetis.</div>
         </div>
-
-        <!-- Filter Architecture: FIR vs IIR -->
-        <div>
-          <label class="text-xs text-[var(--muted-foreground)] block mb-1">Arsitektur Filter</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="btnTypeFIR" class="py-1.5 px-3 rounded-lg text-xs font-semibold border border-blue-500 bg-blue-500/10 text-blue-500 transition-colors cursor-pointer">
-              FIR (Linear Phase)
-            </button>
-            <button id="btnTypeIIR" class="py-1.5 px-3 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] transition-colors cursor-pointer">
-              IIR (Butterworth)
-            </button>
-          </div>
-        </div>
-
-        <!-- Dual Cutoff Controls for Bandpass (BPF) -->
-        <div id="containerDualCutoff" class="space-y-3">
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-[var(--muted-foreground)]">Batas Bawah (f-low):</span>
-              <span id="lblCutoffLow" class="font-bold text-emerald-500">150 Hz</span>
-            </div>
-            <input id="sliderCutoffLow" type="range" min="50" max="1500" step="25" value="150" class="w-full accent-emerald-500 cursor-pointer">
-          </div>
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-[var(--muted-foreground)]">Batas Atas (f-high):</span>
-              <span id="lblCutoffHigh" class="font-bold text-emerald-500">3500 Hz</span>
-            </div>
-            <input id="sliderCutoffHigh" type="range" min="1500" max="7500" step="50" value="3500" class="w-full accent-emerald-500 cursor-pointer">
-          </div>
-        </div>
-
-        <!-- Cutoff Controls for LPF/HPF -->
-        <div id="containerSingleCutoff" class="space-y-2 hidden">
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-[var(--muted-foreground)]" id="lblCutoffTitle">Frekuensi Cutoff (fc):</span>
-            <span id="lblCutoff" class="font-bold text-blue-500">3000 Hz</span>
-          </div>
-          <input id="sliderCutoff" type="range" min="100" max="7500" step="50" value="3000" class="w-full accent-blue-500 cursor-pointer">
-        </div>
-
-        <!-- Taps for FIR -->
-        <div id="containerTaps">
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-[var(--muted-foreground)]">Jumlah Taps Orde FIR (M):</span>
-            <span id="lblTapsVal" class="font-bold text-[var(--foreground)]">41 Taps</span>
-          </div>
-          <input id="sliderTaps" type="range" min="15" max="85" step="2" value="41" class="w-full accent-blue-500 cursor-pointer">
+        <div id="paneFile" class="hidden">
+          <label class="drop">
+            <span style="font-size:18px">📂</span>
+            <b style="color:var(--filt)">Klik untuk memilih file audio</b>
+            <span class="muted" id="fileLabel">.wav, .mp3, .m4a, .mp4 (WhatsApp), .opus, dll</span>
+            <input type="file" id="inputFile" class="hidden">
+          </label>
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-head">
+          <h3>⚡ 2. Injeksi Noise Buatan</h3>
+          <label class="toggle"><input type="checkbox" id="chkNoise"> <span id="noiseLbl">Mati</span></label>
+        </div>
+        <div id="paneNoise">
+          <span class="lbl2">Jenis noise</span>
+          <select id="selNoise">
+            <option value="highfreq">Dengkingan tajam (sinus 4.500 Hz)</option>
+            <option value="white">Desis acak (White Gaussian Noise)</option>
+            <option value="lowfreq">Dengung listrik / hum (120 Hz)</option>
+            <option value="both">Ganda: hum 120 Hz + desis 5.000 Hz</option>
+          </select>
+          <div class="field">
+            <div class="row"><span class="muted">Volume noise</span><b id="noiseAmpLbl" style="color:var(--noisy)">0,50</b></div>
+            <input type="range" id="sliderNoise" min="0.05" max="1.2" step="0.05" value="0.5" style="accent-color:var(--noisy)">
+          </div>
+        </div>
+        <div class="note" id="noiseNote">Noise buatan diperlukan sebagai referensi untuk menghitung SNR.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>🎛️ 3. Desain Filter Digital</h3></div>
+        <span class="lbl2">Mode filter frekuensi</span>
+        <div class="seg c3" id="segMode">
+          <button data-mode="bandpass">Band-Pass</button>
+          <button data-mode="lowpass">Low-Pass</button>
+          <button data-mode="highpass">High-Pass</button>
+        </div>
+        <div class="field">
+          <span class="lbl2">Arsitektur filter</span>
+          <div class="seg c2" id="segArch">
+            <button data-arch="FIR">FIR (Fasa Linear)</button>
+            <button data-arch="IIR">IIR (Butterworth)</button>
+          </div>
+        </div>
+        <div id="boxDual">
+          <div class="field">
+            <div class="row"><span class="muted">Batas bawah f<sub>low</sub></span><b id="lblLow">150 Hz</b></div>
+            <input type="range" id="sliderLow" min="50" max="1500" step="25" value="150">
+          </div>
+          <div class="field">
+            <div class="row"><span class="muted">Batas atas f<sub>high</sub></span><b id="lblHigh">3500 Hz</b></div>
+            <input type="range" id="sliderHigh" min="1000" max="7500" step="50" value="3500">
+          </div>
+        </div>
+        <div id="boxSingle" class="hidden">
+          <div class="field">
+            <div class="row"><span class="muted" id="lblFcTitle">Frekuensi cutoff f<sub>c</sub></span><b id="lblFc">3000 Hz</b></div>
+            <input type="range" id="sliderFc" min="100" max="7500" step="50" value="3000">
+          </div>
+        </div>
+        <div id="boxTaps">
+          <div class="field">
+            <div class="row"><span class="muted">Jumlah taps FIR (M)</span><b id="lblTaps">41 taps</b></div>
+            <input type="range" id="sliderTaps" min="15" max="85" step="2" value="41">
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Delay τ = (M−1)/2</div><div class="v" id="stDelay">–</div></div>
+            <div class="stat"><div class="k">Lebar transisi ≈ 3,3·F<sub>s</sub>/M</div><div class="v" id="stTrans">–</div></div>
+            <div class="stat"><div class="k">Perkalian / sampel</div><div class="v" id="stMul">–</div></div>
+            <div class="stat"><div class="k">Redaman stopband</div><div class="v">≈ −53 dB</div></div>
+          </div>
+        </div>
+        <div class="note hidden" id="iirNote">Filter IIR Butterworth orde 4 per tepi cutoff (LPF/HPF: 2 biquad, BPF: 4 biquad). Slider taps hanya berlaku untuk FIR.</div>
+      </div>
+
+      <p class="small muted" style="text-align:center">F<sub>s</sub> = 16.000 Hz · 48.000 sampel · Nyquist 8.000 Hz</p>
     </div>
 
-    <!-- RIGHT COLUMN: VISUALIZATIONS & ADVANCED PSD ANALYSIS (8 COLS) -->
-    <div class="lg:col-span-8 space-y-4">
-      
-      <!-- Time Domain Canvas -->
-      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-xs">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <div>
-            <h3 class="text-sm font-semibold text-[var(--foreground)]">1. Domain Waktu: Bentuk Gelombang Sinyal</h3>
-            <span class="text-xs text-[var(--muted-foreground)]">Menampilkan 400 sampel (t ≈ 0 - 25 ms)</span>
-          </div>
-          <div class="flex items-center gap-3 text-xs">
-            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-emerald-500 rounded"></span> Asli</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-red-500/70 rounded"></span> Bising (+Noise)</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-blue-500 rounded"></span> Hasil Filter</span>
+    <!-- RIGHT: VISUALIZATION -->
+    <div class="col">
+
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Domain Waktu: Bentuk Gelombang</h3><div class="desc">400 sampel (25 ms). Hasil filter sudah digeser sebesar delay filter agar bisa dibandingkan langsung.</div></div>
+          <div class="legend">
+            <span><i class="sw" style="background:var(--clean)"></i>Asli</span>
+            <span><i class="sw" style="background:var(--noisy)"></i>Bising</span>
+            <span><i class="sw" style="background:var(--filt)"></i>Hasil filter</span>
           </div>
         </div>
-        <div class="w-full h-48 bg-[var(--background)] rounded-lg overflow-hidden border border-[var(--border)] relative">
-          <canvas id="canvasTime" class="w-full h-full block"></canvas>
+        <div class="chart"><canvas id="cvTime"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Domain Frekuensi: Spektrum FFT</h3><div class="desc">Rata-rata 12 jendela FFT 1024 titik (Hann). Area hijau = pita lolos (passband).</div></div>
+          <div class="legend">
+            <span><i class="sw" style="background:var(--noisy)"></i>Spektrum input</span>
+            <span><i class="sw" style="background:var(--filt)"></i>Spektrum hasil</span>
+            <span style="color:var(--clean)"><i class="sw dash"></i>Batas cutoff</span>
+          </div>
+        </div>
+        <div class="chart"><canvas id="cvFFT"></canvas></div>
+      </div>
+
+      <div class="two">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Energi per Pita Frekuensi <span class="new">baru</span></h3><div class="desc">Berapa banyak energi di tiap pita sebelum dan sesudah filter.</div></div>
+          </div>
+          <div class="legend" style="margin-bottom:8px">
+            <span><i class="sw" style="background:var(--clean)"></i>Asli</span>
+            <span><i class="sw" style="background:var(--noisy)"></i>Bising</span>
+            <span><i class="sw" style="background:var(--filt)"></i>Hasil filter</span>
+          </div>
+          <div class="chart"><canvas id="cvBands"></canvas></div>
+          <p class="caption" id="bandsCaption"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Pencari Titik Manis f<sub>c</sub> <span class="new">baru</span></h3><div class="desc" id="sweepDesc">ΔSNR untuk setiap nilai cutoff.</div></div>
+            <button class="btn" id="btnSweet" style="padding:5px 10px">🎯 Pakai titik terbaik</button>
+          </div>
+          <div class="chart"><canvas id="cvSweep"></canvas><div class="empty hidden" id="sweepEmpty">Nyalakan <b>Injeksi Noise Buatan</b> agar ada sinyal referensi untuk menghitung SNR.</div></div>
+          <p class="caption" id="sweepCaption"></p>
         </div>
       </div>
 
-      <!-- Frequency Domain Canvas (FFT) with Passband Shading -->
-      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-xs">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <div>
-            <h3 class="text-sm font-semibold text-[var(--foreground)]">2. Domain Frekuensi: Analisis Spektrum Daya FFT</h3>
-            <span class="text-xs text-[var(--muted-foreground)]">
-              Area hijau transparan = <strong>Pita Lolos (Passband)</strong>
-            </span>
-          </div>
-          <div class="flex items-center gap-3 text-xs">
-            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-red-400/60 rounded"></span> Spektrum Input</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-blue-500 rounded"></span> Spektrum Bersih</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-emerald-500 border border-dashed border-emerald-500"></span> Batas Cutoff</span>
+      <div class="card">
+        <div class="card-head">
+          <div><h3 style="color:var(--purple)">🎓 Karakteristik Teoretis Filter: FIR vs IIR</h3><div class="desc">Dihitung langsung dari koefisien filter yang sedang dipakai.</div></div>
+          <div class="tabs" id="tabsAcad">
+            <button data-view="mag">Magnitudo |H(ω)|</button>
+            <button data-view="phase">Fasa ∠H(ω)</button>
+            <button data-view="gd">Group Delay</button>
+            <button data-view="imp">Respon Impuls h[n]</button>
+            <button data-view="pz">Pole-Zero (Bidang Z)</button>
           </div>
         </div>
-        <div class="w-full h-52 bg-[var(--background)] rounded-lg overflow-hidden border border-[var(--border)] relative">
-          <canvas id="canvasFreq" class="w-full h-full block"></canvas>
-        </div>
+        <div class="legend" id="acadLegend" style="margin-bottom:8px"></div>
+        <div class="chart tall"><canvas id="cvAcad"></canvas></div>
+        <div class="explain" id="acadExplain"></div>
       </div>
 
-      <!-- ADVANCED ACADEMIC ANALYSIS PANEL (BODE, PHASE & Z-PLANE) -->
-      <div class="bg-[var(--card)] border-2 border-purple-500/30 rounded-xl p-4 shadow-sm space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
-          <div>
-            <h3 class="text-sm font-bold text-purple-500 flex items-center gap-1.5">
-              <span>🎓</span> 3. Karakteristik Teoretis Filter: Respon Fasa & Bidang Z
-            </h3>
-            <span class="text-xs text-[var(--muted-foreground)]">Bukti ilmiah PSD: Fasa Linear (FIR) vs Kestabilan Lingkaran Satuan |z| = 1 (IIR)</span>
-          </div>
-          
-          <!-- Tab Selector for Academic Charts -->
-          <div class="flex items-center gap-1.5 text-xs">
-            <button id="tabAcadBode" class="px-2.5 py-1 rounded-md font-semibold bg-purple-500 text-white transition-all cursor-pointer">
-              Respon Magnitudo |H(ω)|
-            </button>
-            <button id="tabAcadPhase" class="px-2.5 py-1 rounded-md font-medium border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all cursor-pointer">
-              Respon Fasa ∠H(ω)
-            </button>
-            <button id="tabAcadZPlane" class="px-2.5 py-1 rounded-md font-medium border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all cursor-pointer">
-              Diagram Pole-Zero (Bidang Z)
-            </button>
-          </div>
+      <div class="card">
+        <div class="card-head">
+          <div><h3>⚖️ Perbandingan Langsung FIR vs IIR <span class="new">baru</span></h3><div class="desc">Kedua filter dijalankan pada sinyal yang sama dengan pengaturan cutoff yang sama. Kolom yang disorot adalah filter yang sedang aktif.</div></div>
         </div>
-
-        <!-- Academic Canvas Container -->
-        <div class="w-full h-52 bg-[var(--background)] rounded-lg overflow-hidden border border-[var(--border)] relative">
-          <canvas id="canvasAcademic" class="w-full h-full block"></canvas>
-        </div>
-
-        <!-- Theoretical Notes Badge -->
-        <div id="academicExplanation" class="text-xs text-[var(--muted-foreground)] p-2.5 bg-purple-500/5 rounded-lg border border-purple-500/20 leading-relaxed">
-          <strong class="text-purple-500 font-semibold">Analisis Bode Magnitudo:</strong> Menampilkan respon frekuensi murni dari filter tanpa dipengaruhi sinyal input. Terlihat kurva pita lolos, frekuensi cutoff, dan pita redaman (stopband attenuation).
+        <div style="overflow-x:auto">
+          <table class="cmp" id="tblCmp">
+            <thead><tr><th>Aspek</th><th id="thFIR">FIR (Hamming, M taps)</th><th id="thIIR">IIR (Butterworth orde 4)</th></tr></thead>
+            <tbody></tbody>
+          </table>
         </div>
       </div>
 
     </div>
   </main>
 
-  <!-- JAVASCRIPT ENGINE -->
-  <script>
-    const FS = 16000;            // 16 kHz HD Voice
-    const RECORD_SECONDS = 3.0;   // STRICT 3 SECONDS (Smooth, zero-freeze)
-    const TOTAL_SAMPLES = Math.floor(FS * RECORD_SECONDS); // 48,000 samples
-    
-    let audioCtx = null;
-    let activeSource = null;
-    let playStartTime = 0;
-    let isPlaying = false;
-    let currentAuditionTrack = 'filtered';
-    let loopEnabled = true;
-    let academicChartMode = 'bode'; // 'bode', 'phase', 'zplane'
+  <p class="foot">Pemrosesan Sinyal Digital (PSD) · S1 Teknik Elektro · Pintasan: <kbd>Spasi</kbd> putar/hentikan hasil filter · <kbd>F</kbd> FIR/IIR</p>
+</div>
 
-    let cleanBuffer = new Float32Array(TOTAL_SAMPLES);
-    let noisyBuffer = new Float32Array(TOTAL_SAMPLES);
-    let filteredBuffer = new Float32Array(TOTAL_SAMPLES);
+<script>
+'use strict';
+// =====================================================================
+//  KONSTANTA & STATE
+// =====================================================================
+const FS = 16000;                 // laju sampling (HD Voice)
+const SECONDS = 3;
+const N = FS * SECONDS;           // 48.000 sampel
+const NFFT = 1024;
 
-    let currentSourceMode = 'mic';
+const state = {
+  source: 'synth', synth: 'speech',
+  noiseOn: true, noiseType: 'highfreq', noiseAmp: 0.5,
+  arch: 'FIR', mode: 'bandpass',
+  fc: 3000, fLow: 150, fHigh: 3500, taps: 41,
+  view: 'mag'
+};
 
-    const state = {
-      signalType: 'speech',
-      enableNoise: false,
-      noiseType: 'highfreq',
-      noiseAmp: 0.50,
-      filterArch: 'FIR',
-      filterMode: 'bandpass',
-      cutoff: 3000,
-      cutoffLow: 150,
-      cutoffHigh: 3500,
-      taps: 41
+let clean = new Float32Array(N);
+let noisy = new Float32Array(N);
+let filtered = new Float32Array(N);
+let other = null;                 // hasil filter arsitektur lain (untuk tabel perbandingan)
+let hFIR = null, sosIIR = null;   // koefisien filter aktif
+let snr = null, snrOther = null, lag = 0;
+const recorded = { mic: null, file: null };
+let noiseUnit = {};
+
+const $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (v, d = 0) => Number(v).toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// =====================================================================
+//  PEMBANGKIT SINYAL & NOISE
+// =====================================================================
+function mulberry32(a) {            // PRNG ber-seed: noise sama setiap kali dihitung ulang
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function buildNoise() {
+  const rnd = mulberry32(2026);
+  const white = new Float32Array(N), hf = new Float32Array(N), lf = new Float32Array(N), both = new Float32Array(N);
+  for (let n = 0; n < N; n++) {
+    const t = n / FS;
+    const u1 = Math.max(1e-9, rnd()), u2 = rnd();
+    white[n] = 0.45 * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    hf[n] = Math.sin(2 * Math.PI * 4500 * t);
+    lf[n] = Math.sin(2 * Math.PI * 120 * t);
+    both[n] = 0.6 * Math.sin(2 * Math.PI * 120 * t) + 0.6 * Math.sin(2 * Math.PI * 5000 * t);
+  }
+  noiseUnit = { white, highfreq: hf, lowfreq: lf, both };
+}
+
+function makeSynth() {
+  const b = new Float32Array(N);
+  for (let n = 0; n < N; n++) {
+    const t = n / FS;
+    const env = 0.8 + 0.2 * Math.sin(2 * Math.PI * 3 * t);
+    if (state.synth === 'speech') b[n] = env * (0.65 * Math.sin(2 * Math.PI * 440 * t) + 0.35 * Math.sin(2 * Math.PI * 880 * t));
+    else if (state.synth === 'pure') b[n] = 0.8 * Math.sin(2 * Math.PI * 400 * t);
+    else b[n] = 0.5 * Math.sin(2 * Math.PI * 800 * t) + 0.5 * Math.sin(2 * Math.PI * 1800 * t);
+  }
+  return b;
+}
+
+function loadSourceBuffer() {
+  if (state.source === 'synth' || !recorded[state.source]) clean = makeSynth();
+  else clean = recorded[state.source].slice();
+}
+
+function computeNoisy() {
+  const u = noiseUnit[state.noiseType], a = state.noiseAmp;
+  for (let n = 0; n < N; n++) noisy[n] = clean[n] + (state.noiseOn ? a * u[n] : 0);
+}
+
+// =====================================================================
+//  DESAIN FILTER
+// =====================================================================
+// FIR: metode windowed-sinc dengan jendela Hamming
+function designFIR(M, mode, fc, fl, fh) {
+  const h = new Float64Array(M), c = (M - 1) / 2;
+  const sinc = (f, n) => n === 0 ? 2 * f : Math.sin(2 * Math.PI * f * n) / (Math.PI * n);
+  for (let i = 0; i < M; i++) {
+    const n = i - c;
+    let v;
+    if (mode === 'lowpass') v = sinc(fc / FS, n);
+    else if (mode === 'highpass') v = (n === 0 ? 1 : 0) - sinc(fc / FS, n);
+    else v = sinc(fh / FS, n) - sinc(fl / FS, n);
+    h[i] = v * (0.54 - 0.46 * Math.cos(2 * Math.PI * i / (M - 1)));
+  }
+  // Normalisasi: gain 0 dB di frekuensi acuan pita lolos
+  const fRef = mode === 'lowpass' ? 0 : mode === 'highpass' ? FS / 2 : Math.sqrt(fl * fh);
+  const g = Math.sqrt(polyResp(h, 2 * Math.PI * fRef / FS).m2);
+  if (g > 1e-9) for (let i = 0; i < M; i++) h[i] /= g;
+  return h;
+}
+
+// IIR: Butterworth orde 4 per tepi, kaskade biquad (transformasi bilinear, rumus RBJ)
+function biquad(type, f, Q) {
+  const w0 = 2 * Math.PI * f / FS, c = Math.cos(w0), al = Math.sin(w0) / (2 * Q), a0 = 1 + al;
+  const b = type === 'lp' ? [(1 - c) / 2, 1 - c, (1 - c) / 2] : [(1 + c) / 2, -(1 + c), (1 + c) / 2];
+  return { b: b.map(v => v / a0), a: [1, -2 * c / a0, (1 - al) / a0] };
+}
+function designIIR(mode, fc, fl, fh) {
+  const Q1 = 0.5411961, Q2 = 1.3065630;          // Q Butterworth orde 4
+  if (mode === 'lowpass') return [biquad('lp', fc, Q1), biquad('lp', fc, Q2)];
+  if (mode === 'highpass') return [biquad('hp', fc, Q1), biquad('hp', fc, Q2)];
+  // BPF = HPF Butterworth orde 4 (di f_low) + LPF Butterworth orde 4 (di f_high)
+  return [biquad('hp', fl, Q1), biquad('hp', fl, Q2), biquad('lp', fh, Q1), biquad('lp', fh, Q2)];
+}
+
+const iirName = () => state.mode === 'bandpass' ? 'IIR Butterworth orde 8 (HPF 4 + LPF 4)' : 'IIR Butterworth orde 4';
+
+function applyFIR(x, h) {
+  const M = h.length, L = x.length, y = new Float32Array(L);
+  for (let n = 0; n < L; n++) {
+    let acc = 0;
+    const kMax = Math.min(n, M - 1);
+    for (let k = 0; k <= kMax; k++) acc += h[k] * x[n - k];
+    y[n] = acc;
+  }
+  return y;
+}
+function applySOS(x, sos) {
+  let cur = x;
+  for (const s of sos) {
+    const [b0, b1, b2] = s.b, a1 = s.a[1], a2 = s.a[2];
+    const y = new Float32Array(cur.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let n = 0; n < cur.length; n++) {
+      const x0 = cur[n];
+      const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+      y[n] = y0; x2 = x1; x1 = x0; y2 = y1; y1 = y0;
+    }
+    cur = y;
+  }
+  return cur;
+}
+function runFilter(arch, x, p = state) {
+  if (arch === 'FIR') return applyFIR(x, designFIR(p.taps, p.mode, p.fc, p.fLow, p.fHigh));
+  return applySOS(x, designIIR(p.mode, p.fc, p.fLow, p.fHigh));
+}
+
+// =====================================================================
+//  ANALISIS: RESPON FREKUENSI, GROUP DELAY, AKAR POLINOM
+// =====================================================================
+// Respon polinom B(e^jw) = sum b_k e^{-jwk} beserta group delay-nya
+function polyResp(c, w) {
+  let re = 0, im = 0, nre = 0, nim = 0;
+  for (let k = 0; k < c.length; k++) {
+    const cs = Math.cos(w * k), sn = Math.sin(w * k);
+    re += c[k] * cs; im -= c[k] * sn;
+    nre += k * c[k] * cs; nim -= k * c[k] * sn;
+  }
+  const m2 = re * re + im * im;
+  return { re, im, m2, gd: m2 > 1e-24 ? (nre * re + nim * im) / m2 : NaN };
+}
+function freqResp(arch, f) {
+  const w = 2 * Math.PI * f / FS;
+  if (arch === 'FIR') {
+    const r = polyResp(hFIR, w);
+    return { mag: Math.sqrt(r.m2), ph: Math.atan2(r.im, r.re), gd: r.gd };
+  }
+  let Hr = 1, Hi = 0, gd = 0;
+  for (const s of sosIIR) {
+    const B = polyResp(s.b, w), A = polyResp(s.a, w);
+    const qr = (B.re * A.re + B.im * A.im) / A.m2, qi = (B.im * A.re - B.re * A.im) / A.m2;
+    [Hr, Hi] = [Hr * qr - Hi * qi, Hr * qi + Hi * qr];
+    gd += B.gd - A.gd;
+  }
+  return { mag: Math.hypot(Hr, Hi), ph: Math.atan2(Hi, Hr), gd };
+}
+function responseCurve(arch, bins = 400) {
+  const f = [], mag = [], ph = [], gd = [];
+  let prev = 0, offset = 0;
+  for (let i = 0; i < bins; i++) {
+    const fr = (i / (bins - 1)) * (FS / 2) * 0.999 + 1;
+    const r = freqResp(arch, fr);
+    let p = r.ph;
+    if (i > 0) { let d = p + offset - prev; while (d > Math.PI) { offset -= 2 * Math.PI; d -= 2 * Math.PI; } while (d < -Math.PI) { offset += 2 * Math.PI; d += 2 * Math.PI; } }
+    p += offset; prev = p;
+    f.push(fr); mag.push(20 * Math.log10(Math.max(r.mag, 1e-6))); ph.push(p * 180 / Math.PI); gd.push(r.gd);
+  }
+  return { f, mag, ph, gd };
+}
+
+// Akar polinom (metode Durand–Kerner). coef[0]·z^n + ... + coef[n]
+function polyRoots(coef) {
+  let c = Array.from(coef);
+  while (c.length > 1 && Math.abs(c[0]) < 1e-14) c.shift();
+  const n = c.length - 1;
+  if (n < 1) return [];
+  const a0 = c[0]; c = c.map(v => v / a0);
+  const re = new Float64Array(n), im = new Float64Array(n);
+  let pr = 1, pi = 0;
+  for (let i = 0; i < n; i++) { [pr, pi] = [pr * 0.4 - pi * 0.9, pr * 0.9 + pi * 0.4]; re[i] = pr; im[i] = pi; }
+  for (let it = 0; it < 600; it++) {
+    let maxD = 0;
+    for (let i = 0; i < n; i++) {
+      const zr = re[i], zi = im[i];
+      let vr = 1, vi = 0;
+      for (let k = 1; k <= n; k++) { [vr, vi] = [vr * zr - vi * zi + c[k], vr * zi + vi * zr]; }
+      let dr = 1, di = 0;
+      for (let j = 0; j < n; j++) if (j !== i) { const xr = zr - re[j], xi = zi - im[j]; [dr, di] = [dr * xr - di * xi, dr * xi + di * xr]; }
+      const den = dr * dr + di * di || 1e-30;
+      const qr = (vr * dr + vi * di) / den, qi = (vi * dr - vr * di) / den;
+      re[i] -= qr; im[i] -= qi;
+      maxD = Math.max(maxD, Math.abs(qr) + Math.abs(qi));
+    }
+    if (maxD < 1e-11) break;
+  }
+  return Array.from(re, (r, i) => [r, im[i]]);
+}
+function quadRoots(a, b, c) {      // a z^2 + b z + c
+  const d = b * b - 4 * a * c;
+  if (d >= 0) { const s = Math.sqrt(d); return [[(-b + s) / (2 * a), 0], [(-b - s) / (2 * a), 0]]; }
+  const s = Math.sqrt(-d); return [[-b / (2 * a), s / (2 * a)], [-b / (2 * a), -s / (2 * a)]];
+}
+
+// =====================================================================
+//  SNR (dengan kompensasi delay otomatis)
+// =====================================================================
+function bestLag(c, y, maxLag = 150) {
+  const s = 300, e = c.length - 300 - maxLag;
+  let best = 0, bestErr = Infinity;
+  for (let L = 0; L <= maxLag; L++) {
+    let err = 0;
+    for (let i = s; i < e; i += 3) { const d = y[i + L] - c[i]; err += d * d; }
+    if (err < bestErr) { bestErr = err; best = L; }
+  }
+  return best;
+}
+function measureSNR(c, x, y, L) {
+  const s = 300, e = c.length - 450;
+  let pc = 0, pin = 0, pout = 0;
+  for (let i = s; i < e; i++) {
+    pc += c[i] * c[i];
+    const di = x[i] - c[i]; pin += di * di;
+    const d = y[i + L] - c[i]; pout += d * d;
+  }
+  const snrIn = 10 * Math.log10(pc / Math.max(pin, 1e-12));
+  const snrOut = 10 * Math.log10(pc / Math.max(pout, 1e-12));
+  return { snrIn, snrOut, gain: snrOut - snrIn };
+}
+
+// =====================================================================
+//  FFT & SPEKTRUM
+// =====================================================================
+const hann = Float64Array.from({ length: NFFT }, (_, i) => 0.5 * (1 - Math.cos(2 * Math.PI * i / (NFFT - 1))));
+function fftPower(buf, off, acc) {
+  const re = new Float64Array(NFFT), im = new Float64Array(NFFT);
+  for (let i = 0; i < NFFT; i++) re[i] = (buf[off + i] || 0) * hann[i];
+  for (let i = 0, j = 0; i < NFFT - 1; i++) {
+    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; }
+    let k = NFFT >> 1; while (k <= j) { j -= k; k >>= 1; } j += k;
+  }
+  for (let len = 2; len <= NFFT; len <<= 1) {
+    const half = len >> 1, ang = -2 * Math.PI / len, sr = Math.cos(ang), si = Math.sin(ang);
+    for (let i = 0; i < NFFT; i += len) {
+      let wr = 1, wi = 0;
+      for (let k = 0; k < half; k++) {
+        const a = i + k, b = a + half;
+        const vr = re[b] * wr - im[b] * wi, vi = re[b] * wi + im[b] * wr;
+        re[b] = re[a] - vr; im[b] = im[a] - vi; re[a] += vr; im[a] += vi;
+        [wr, wi] = [wr * sr - wi * si, wr * si + wi * sr];
+      }
+    }
+  }
+  const norm = NFFT / 4;
+  for (let i = 0; i < NFFT / 2; i++) acc[i] += (re[i] * re[i] + im[i] * im[i]) / (norm * norm);
+}
+function avgSpectrum(buf, frames = 12) {
+  const acc = new Float64Array(NFFT / 2);
+  const start = 1000, span = buf.length - NFFT - 2000;
+  for (let f = 0; f < frames; f++) fftPower(buf, start + Math.floor(f * span / (frames - 1)), acc);
+  for (let i = 0; i < acc.length; i++) acc[i] /= frames;
+  return acc;                     // daya per bin (sinus amplitudo 1 ≈ 0 dB)
+}
+const toDB = p => 10 * Math.log10(Math.max(p, 1e-9));
+const BANDS = [
+  { name: 'Bass / dengung', range: '< 150 Hz', lo: 0, hi: 150 },
+  { name: 'Vokal', range: '150 – 3.500 Hz', lo: 150, hi: 3500 },
+  { name: 'Treble / desis', range: '> 3.500 Hz', lo: 3500, hi: 8000 }
+];
+function bandEnergy(spec) {
+  return BANDS.map(b => {
+    let s = 0;
+    for (let i = 0; i < spec.length; i++) { const f = i * FS / NFFT; if (f >= b.lo && f < b.hi) s += spec[i]; }
+    return toDB(s);
+  });
+}
+
+// =====================================================================
+//  PIPELINE UTAMA
+// =====================================================================
+let spec = null, sweep = null, pzCache = { key: '', zeros: [] };
+
+function recompute() {
+  computeNoisy();
+  hFIR = designFIR(state.taps, state.mode, state.fc, state.fLow, state.fHigh);
+  sosIIR = designIIR(state.mode, state.fc, state.fLow, state.fHigh);
+  filtered = state.arch === 'FIR' ? applyFIR(noisy, hFIR) : applySOS(noisy, sosIIR);
+  other = state.arch === 'FIR' ? applySOS(noisy, sosIIR) : applyFIR(noisy, hFIR);
+
+  lag = bestLag(clean, filtered);
+  const lagOther = bestLag(clean, other);
+  snr = state.noiseOn ? measureSNR(clean, noisy, filtered, lag) : null;
+  snrOther = state.noiseOn ? measureSNR(clean, noisy, other, lagOther) : null;
+  state._lagOther = lagOther;
+
+  spec = { clean: avgSpectrum(clean), noisy: avgSpectrum(noisy), filt: avgSpectrum(filtered) };
+}
+
+let rafPending = false, sweepTimer = null;
+function update() {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(() => {
+    rafPending = false;
+    recompute();
+    renderUI();
+    drawAll();
+    if (isPlaying) hotSwap();
+    clearTimeout(sweepTimer);
+    sweepTimer = setTimeout(() => { computeSweep(); drawSweep(); }, 160);
+  });
+}
+
+// =====================================================================
+//  PENCARI TITIK MANIS (sweep ΔSNR terhadap cutoff)
+// =====================================================================
+function sweepAxis() {
+  if (state.mode === 'lowpass') return { key: 'fc', label: 'f_c LPF', from: 300, to: 7500, step: 300 };
+  if (state.mode === 'highpass') return { key: 'fc', label: 'f_c HPF', from: 50, to: 2000, step: 75 };
+  return { key: 'fHigh', label: 'f_high BPF', from: Math.max(1000, state.fLow + 200), to: 7500, step: 250 };
+}
+function computeSweep() {
+  if (!state.noiseOn) { sweep = null; return; }
+  const ax = sweepAxis();
+  const a = 4000, b = a + 8000;
+  const c = clean.subarray(a, b), x = noisy.subarray(a, b);
+  const pts = [];
+  for (let v = ax.from; v <= ax.to; v += ax.step) {
+    const p = { ...state, [ax.key]: v };
+    const y = runFilter(state.arch, x, p);
+    const L = bestLag(c, y, 120);
+    pts.push({ v, g: measureSNR(c, x, y, L).gain });
+  }
+  let best = pts[0];
+  pts.forEach(p => { if (p.g > best.g) best = p; });
+  sweep = { ax, pts, best };
+}
+
+// =====================================================================
+//  UI TEKS
+// =====================================================================
+const PRESETS = {
+  voice: { mode: 'bandpass', fLow: 150, fHigh: 3500 },
+  hiss: { mode: 'lowpass', fc: 3000 },
+  hum: { mode: 'highpass', fc: 200 }
+};
+function activePreset() {
+  if (state.mode === 'bandpass' && state.fLow === 150 && state.fHigh === 3500) return 'voice';
+  if (state.mode === 'lowpass' && state.fc === 3000) return 'hiss';
+  if (state.mode === 'highpass' && state.fc === 200) return 'hum';
+  return null;
+}
+function passbandText() {
+  if (state.mode === 'bandpass') return [`${fmt(state.fLow)} – ${fmt(state.fHigh)} Hz`, 'Band-pass: loloskan pita tengah'];
+  if (state.mode === 'lowpass') return [`0 – ${fmt(state.fc)} Hz`, 'Low-pass: buang frekuensi tinggi'];
+  return [`${fmt(state.fc)} – 8.000 Hz`, 'High-pass: buang frekuensi rendah'];
+}
+
+function renderUI() {
+  // tombol aktif
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === state.mode));
+  document.querySelectorAll('[data-arch]').forEach(b => b.classList.toggle('on', b.dataset.arch === state.arch));
+  document.querySelectorAll('[data-src]').forEach(b => b.classList.toggle('on', b.dataset.src === state.source));
+  document.querySelectorAll('#tabsAcad [data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === state.view));
+  const pr = activePreset();
+  document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('on', b.dataset.preset === pr));
+  $('presetNote').textContent = pr ? '' : '· pengaturan kustom';
+
+  $('boxDual').classList.toggle('hidden', state.mode !== 'bandpass');
+  $('boxSingle').classList.toggle('hidden', state.mode === 'bandpass');
+  $('lblFcTitle').innerHTML = state.mode === 'lowpass' ? 'Cutoff LPF f<sub>c</sub>' : 'Cutoff HPF f<sub>c</sub>';
+  $('boxTaps').classList.toggle('hidden', state.arch !== 'FIR');
+  $('iirNote').classList.toggle('hidden', state.arch !== 'IIR');
+
+  $('paneSynth').classList.toggle('hidden', state.source !== 'synth');
+  $('paneMic').classList.toggle('hidden', state.source !== 'mic');
+  $('paneFile').classList.toggle('hidden', state.source !== 'file');
+
+  $('chkNoise').checked = state.noiseOn;
+  $('noiseLbl').textContent = state.noiseOn ? 'Aktif' : 'Mati';
+  $('noiseLbl').style.color = state.noiseOn ? 'var(--noisy)' : 'var(--muted)';
+  $('paneNoise').classList.toggle('disabled', !state.noiseOn);
+  const nn = $('noiseNote');
+  if (state.noiseOn) { nn.className = 'note ok'; nn.textContent = 'Noise buatan aktif: SNR bisa dihitung karena sinyal aslinya diketahui.'; }
+  else if (state.source === 'synth') { nn.className = 'note warn'; nn.textContent = 'Sinyal sintetis tanpa noise: tidak ada yang perlu dibersihkan. Nyalakan noise untuk melihat efek filter.'; }
+  else { nn.className = 'note'; nn.textContent = 'Noise alami dari mic/rekaman sudah ada. SNR tidak bisa dihitung karena sinyal bersihnya tidak diketahui. Nyalakan noise buatan jika ingin mengukur SNR.'; }
+
+  // label slider
+  $('lblLow').textContent = `${state.fLow} Hz`; $('sliderLow').value = state.fLow;
+  $('lblHigh').textContent = `${state.fHigh} Hz`; $('sliderHigh').value = state.fHigh;
+  $('lblFc').textContent = `${state.fc} Hz`; $('sliderFc').value = state.fc;
+  $('lblTaps').textContent = `${state.taps} taps`; $('sliderTaps').value = state.taps;
+  const tau = (state.taps - 1) / 2;
+  $('stDelay').textContent = `${tau} sampel (${fmt(tau / FS * 1000, 2)} ms)`;
+  $('stTrans').textContent = `± ${fmt(3.3 * FS / state.taps)} Hz`;
+  $('stMul').textContent = `${state.taps} perkalian`;
+
+  // metrik
+  const [pb, pbSub] = passbandText();
+  $('mPass').textContent = pb; $('mPassSub').textContent = pbSub;
+  if (snr) {
+    $('mSnr').textContent = `${snr.gain >= 0 ? '+' : ''}${fmt(snr.gain, 1)} dB`;
+    $('mSnr').style.color = snr.gain >= 0 ? 'var(--clean)' : 'var(--noisy)';
+    $('mSnrSub').textContent = `SNR ${fmt(snr.snrIn, 1)} dB → ${fmt(snr.snrOut, 1)} dB`;
+  } else {
+    $('mSnr').textContent = '—'; $('mSnr').style.color = 'var(--muted)';
+    $('mSnrSub').textContent = 'Butuh noise buatan sebagai referensi';
+  }
+  if (state.arch === 'FIR') {
+    $('mPhase').textContent = 'Fasa linear'; $('mPhase').style.color = 'var(--purple)';
+    $('mPhaseSub').textContent = `Delay konstan ${tau} sampel = ${fmt(tau / FS * 1000, 2)} ms`;
+    $('mOps').textContent = `${state.taps} ×/sampel`;
+    $('mOpsSub').textContent = `${fmt(state.taps * FS)} perkalian per detik`;
+  } else {
+    $('mPhase').textContent = 'Fasa non-linear'; $('mPhase').style.color = 'var(--amber)';
+    $('mPhaseSub').textContent = `Delay terukur ≈ ${lag} sampel (${fmt(lag / FS * 1000, 2)} ms)`;
+    $('mOps').textContent = `${sosIIR.length * 5} ×/sampel`;
+    $('mOpsSub').textContent = `${sosIIR.length} biquad · ${fmt(sosIIR.length * 5 * FS)} perkalian per detik`;
+  }
+
+  renderBandsCaption();
+  renderTable();
+}
+
+function renderBandsCaption() {
+  const eN = bandEnergy(spec.noisy), eF = bandEnergy(spec.filt);
+  const parts = BANDS.map((b, i) => {
+    if (eN[i] < -60 && eF[i] < -60) return `${b.name}: <b>hampir kosong</b>`;
+    const d = eF[i] - eN[i];
+    return `${b.name}: <b>${d >= 0 ? '+' : ''}${fmt(d, 1)} dB</b>`;
+  });
+  $('bandsCaption').innerHTML = 'Perubahan energi setelah filter → ' + parts.join(' · ');
+}
+
+function gdAtCenter(arch) {
+  const f = state.mode === 'lowpass' ? Math.min(500, state.fc / 2) : state.mode === 'highpass' ? Math.min(7000, state.fc * 3) : Math.sqrt(state.fLow * state.fHigh);
+  return freqResp(arch, f).gd;
+}
+function maxPoleRadius() {
+  let m = 0;
+  sosIIR.forEach(s => quadRoots(1, s.a[1], s.a[2]).forEach(([r, i]) => m = Math.max(m, Math.hypot(r, i))));
+  return m;
+}
+function renderTable() {
+  const fir = state.arch === 'FIR';
+  const sF = fir ? snr : snrOther, sI = fir ? snrOther : snr;
+  const g = s => s ? `${s.gain >= 0 ? '+' : ''}${fmt(s.gain, 1)} dB` : '— <span class="muted">(nyalakan noise)</span>';
+  const gF = gdAtCenter('FIR'), gI = gdAtCenter('IIR');
+  let winner = '';
+  if (sF && sI) winner = sF.gain > sI.gain + 0.3 ? 'FIR' : sI.gain > sF.gain + 0.3 ? 'IIR' : 'seri';
+  const rows = [
+    ['ΔSNR pada sinyal ini', g(sF) + (winner === 'FIR' ? ' <span class="good">✓ lebih baik</span>' : ''), g(sI) + (winner === 'IIR' ? ' <span class="good">✓ lebih baik</span>' : '')],
+    ['Respon fasa', 'Linear: semua frekuensi tertunda sama', 'Non-linear: delay berbeda tiap frekuensi (ikut menurunkan ΔSNR, karena SNR dihitung dari bentuk gelombang)'],
+    ['Delay di tengah passband', `${fmt(gF, 1)} sampel (${fmt(gF / FS * 1000, 2)} ms)`, `${fmt(gI, 1)} sampel (${fmt(gI / FS * 1000, 2)} ms)`],
+    ['Perkalian per sampel', `${state.taps}`, `${sosIIR.length * 5} (${sosIIR.length} biquad × 5)`],
+    ['Koefisien disimpan', `${state.taps} (h[0] … h[${state.taps - 1}])`, `${sosIIR.length * 5} (b₀ b₁ b₂ a₁ a₂ × ${sosIIR.length})`],
+    ['Kestabilan', `Selalu stabil: ${state.taps - 1} pole di z = 0`, `Stabil: |pole| maks = ${fmt(maxPoleRadius(), 3)} &lt; 1`],
+    ['Struktur', 'Non-rekursif (hanya input)', 'Rekursif (pakai output sebelumnya)']
+  ];
+  $('thFIR').textContent = `FIR (Hamming, ${state.taps} taps)`;
+  $('thFIR').className = fir ? 'act' : '';
+  $('thIIR').textContent = iirName();
+  $('thIIR').className = fir ? '' : 'act';
+  $('tblCmp').querySelector('tbody').innerHTML = rows.map(r =>
+    `<tr><td>${r[0]}</td><td class="${fir ? 'act' : ''}">${r[1]}</td><td class="${fir ? '' : 'act'}">${r[2]}</td></tr>`).join('');
+}
+
+// =====================================================================
+//  GAMBAR GRAFIK
+// =====================================================================
+function prep(cv) {
+  const r = cv.getBoundingClientRect();
+  if (r.width < 4) return null;
+  const d = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  ctx.clearRect(0, 0, r.width, r.height);
+  ctx.font = '11px system-ui, sans-serif';
+  ctx.lineJoin = 'round';
+  return { ctx, w: r.width, h: r.height };
+}
+function frame(g, o) {
+  const { ctx, w, h } = g;
+  const L = o.left ?? 44, R = 12, T = o.top ?? 12, B = 24;
+  const pw = w - L - R, ph = h - T - B;
+  const X = v => L + (v - o.x0) / (o.x1 - o.x0) * pw;
+  const Y = v => T + (1 - (v - o.y0) / (o.y1 - o.y0)) * ph;
+  ctx.strokeStyle = css('--grid'); ctx.fillStyle = css('--axis'); ctx.lineWidth = 1;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  (o.xt || []).forEach(v => { const x = X(v); ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke(); ctx.fillText(o.xf ? o.xf(v) : v, x, T + ph + 6); });
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  (o.yt || []).forEach(v => { const y = Y(v); ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); ctx.fillText(o.yf ? o.yf(v) : v, L - 6, y); });
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  if (o.yl) { ctx.save(); ctx.translate(11, T + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(o.yl, 0, 0); ctx.restore(); }
+  ctx.save(); ctx.beginPath(); ctx.rect(L, T, pw, ph); ctx.clip();
+  return { X, Y, L, T, pw, ph, done: () => ctx.restore() };
+}
+function line(ctx, xs, ys, X, Y, color, width = 1.6, dash = null, alpha = 1) {
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha;
+  if (dash) ctx.setLineDash(dash);
+  ctx.beginPath();
+  let pen = false;
+  for (let i = 0; i < xs.length; i++) {
+    const y = ys[i];
+    if (y === null || !isFinite(y)) { pen = false; continue; }
+    const px = X(xs[i]), py = Y(y);
+    if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py);
+  }
+  ctx.stroke(); ctx.restore();
+}
+const kHz = v => v === 0 ? '0' : `${v / 1000}k`;
+const F_TICKS = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000];
+
+function shadePassband(ctx, X, T, ph) {
+  ctx.fillStyle = css('--pass');
+  const [a, b] = state.mode === 'bandpass' ? [state.fLow, state.fHigh] : state.mode === 'lowpass' ? [0, state.fc] : [state.fc, FS / 2];
+  ctx.fillRect(X(a), T, X(b) - X(a), ph);
+}
+function cutoffLines(ctx, X, T, ph) {
+  ctx.save(); ctx.strokeStyle = css('--clean'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.4;
+  const cuts = state.mode === 'bandpass' ? [state.fLow, state.fHigh] : [state.fc];
+  cuts.forEach(f => { ctx.beginPath(); ctx.moveTo(X(f), T); ctx.lineTo(X(f), T + ph); ctx.stroke(); });
+  ctx.restore();
+}
+
+function drawTime() {
+  const g = prep($('cvTime')); if (!g) return;
+  // jendela 400 sampel dengan energi terbesar
+  let best = 2000, maxE = -1;
+  for (let i = 1000; i < N - 2000; i += 500) { let e = 0; for (let k = 0; k < 400; k++) e += clean[i + k] ** 2; if (e > maxE) { maxE = e; best = i; } }
+  const xs = [], c = [], x = [], y = [];
+  let peak = 0.05;
+  for (let i = 0; i < 400; i++) {
+    xs.push(i / FS * 1000);
+    c.push(clean[best + i]); x.push(noisy[best + i]); y.push(filtered[best + i + lag]);
+    peak = Math.max(peak, Math.abs(clean[best + i]), Math.abs(filtered[best + i + lag]), state.noiseOn ? Math.abs(noisy[best + i]) : 0);
+  }
+  const lim = Math.ceil(peak * 1.1 * 10) / 10;
+  const f = frame(g, { x0: 0, x1: 25, y0: -lim, y1: lim, xt: [0, 5, 10, 15, 20, 25], xf: v => `${v} ms`, yt: [-lim, 0, lim], yf: v => fmt(v, 1) });
+  if (state.noiseOn) line(g.ctx, xs, x, f.X, f.Y, css('--noisy'), 1.2, null, 0.55);
+  line(g.ctx, xs, c, f.X, f.Y, css('--clean'), 1.8);
+  line(g.ctx, xs, y, f.X, f.Y, css('--filt'), 2);
+  f.done();
+}
+
+function drawFFT() {
+  const g = prep($('cvFFT')); if (!g) return;
+  const f = frame(g, { x0: 0, x1: 8000, y0: -70, y1: 5, xt: F_TICKS, xf: kHz, yt: [-60, -40, -20, 0], yf: v => `${v} dB` });
+  shadePassband(g.ctx, f.X, f.T, f.ph);
+  const fr = Array.from({ length: NFFT / 2 }, (_, i) => i * FS / NFFT);
+  line(g.ctx, fr, Array.from(spec.noisy, toDB), f.X, f.Y, css('--noisy'), 1.3, null, 0.75);
+  line(g.ctx, fr, Array.from(spec.filt, toDB), f.X, f.Y, css('--filt'), 2);
+  cutoffLines(g.ctx, f.X, f.T, f.ph);
+  f.done();
+}
+
+function drawBands() {
+  const g = prep($('cvBands')); if (!g) return;
+  const sets = [bandEnergy(spec.clean), bandEnergy(spec.noisy), bandEnergy(spec.filt)];
+  const top = Math.ceil(Math.max(...sets.flat()) / 10) * 10 + 5;
+  const bottom = top - 75;
+  const f = frame(g, { x0: 0, x1: 3, y0: bottom, y1: top, yt: [bottom + 15, bottom + 35, bottom + 55, top - 5].map(Math.round), yf: v => `${v} dB`, left: 50 });
+  f.done();
+  const { ctx } = g, colors = [css('--clean'), css('--noisy'), css('--filt')];
+  const groupW = f.pw / 3, barW = Math.min(26, groupW / 4.5);
+  BANDS.forEach((b, bi) => {
+    const cx = f.L + groupW * (bi + 0.5);
+    sets.forEach((s, si) => {
+      const v = Math.max(bottom, s[bi]);
+      const x = cx + (si - 1) * (barW + 4) - barW / 2;
+      const y = f.Y(v), y0 = f.Y(bottom);
+      ctx.fillStyle = colors[si];
+      ctx.globalAlpha = si === 1 ? 0.75 : 1;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, barW, y0 - y, [4, 4, 0, 0]) : ctx.rect(x, y, barW, y0 - y); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+    ctx.fillStyle = css('--fg'); ctx.textAlign = 'center'; ctx.font = '600 11px system-ui, sans-serif';
+    ctx.fillText(b.name, cx, f.T + f.ph + 13);
+    ctx.fillStyle = css('--axis'); ctx.font = '10.5px system-ui, sans-serif';
+    ctx.fillText(b.range, cx, f.T + 12);
+  });
+  ctx.textAlign = 'left';
+}
+
+function drawSweep() {
+  const empty = $('sweepEmpty');
+  const g = prep($('cvSweep'));
+  if (!sweep) {
+    empty.classList.remove('hidden'); $('sweepCaption').textContent = ''; $('btnSweet').disabled = true;
+    $('sweepDesc').textContent = 'ΔSNR untuk setiap nilai cutoff.';
+    return;
+  }
+  empty.classList.add('hidden'); $('btnSweet').disabled = false;
+  if (!g) return;
+  const { ax, pts, best } = sweep;
+  const gs = pts.map(p => p.g);
+  const lo = Math.floor(Math.min(...gs, 0) / 5) * 5, hi = Math.ceil(Math.max(...gs, 1) / 5) * 5;
+  const step = (hi - lo) > 30 ? 10 : 5;
+  const yt = []; for (let v = lo; v <= hi; v += step) yt.push(v);
+  const xt = []; const xs = ax.to - ax.from > 3000 ? 1000 : 250;
+  for (let v = Math.ceil(ax.from / xs) * xs; v <= ax.to; v += xs) xt.push(v);
+  const f = frame(g, { x0: ax.from, x1: ax.to, y0: lo, y1: hi, xt, xf: v => v >= 1000 ? kHz(v) : `${v}`, yt, yf: v => `${v} dB` });
+  const { ctx } = g;
+  ctx.save(); ctx.strokeStyle = css('--axis'); ctx.globalAlpha = .4; ctx.beginPath(); ctx.moveTo(f.L, f.Y(0)); ctx.lineTo(f.L + f.pw, f.Y(0)); ctx.stroke(); ctx.restore();
+  line(ctx, pts.map(p => p.v), gs, f.X, f.Y, css('--purple'), 2.2);
+  pts.forEach(p => { ctx.fillStyle = css('--purple'); ctx.beginPath(); ctx.arc(f.X(p.v), f.Y(p.g), 2.4, 0, 7); ctx.fill(); });
+  const cur = state[ax.key];
+  ctx.save(); ctx.strokeStyle = css('--filt'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(f.X(cur), f.T); ctx.lineTo(f.X(cur), f.T + f.ph); ctx.stroke(); ctx.restore();
+  ctx.fillStyle = css('--clean'); ctx.beginPath(); ctx.arc(f.X(best.v), f.Y(best.g), 6, 0, 7); ctx.fill();
+  ctx.strokeStyle = css('--card'); ctx.lineWidth = 2; ctx.stroke();
+  f.done();
+  const name = ax.key === 'fHigh' ? 'f<sub>high</sub>' : 'f<sub>c</sub>';
+  $('sweepDesc').innerHTML = `ΔSNR (${state.arch}) jika ${name} digeser, pengaturan lain tetap.`;
+  $('sweepCaption').innerHTML = `Titik terbaik: <b>${name} = ${fmt(best.v)} Hz</b> → ΔSNR <b>${best.g >= 0 ? '+' : ''}${fmt(best.g, 1)} dB</b>. Garis putus-putus biru = posisi slider sekarang.` +
+    (state.source === 'synth' ? ' <i>Catatan: sinyal sintetis hanya berisi nada rendah, jadi cutoff rendah pun aman. Pada suara asli, konsonan (s, t, k) butuh frekuensi sampai ±3.500 Hz.</i>' : '');
+}
+
+const ACAD_TEXT = {
+  mag: () => `<b>Respon magnitudo |H(ω)|</b> adalah profil filter itu sendiri, tidak bergantung pada sinyal input. FIR ${state.taps} taps (biru) dibandingkan ${iirName()} (oranye). Semakin curam lerengnya, semakin tegas pemotongan noise di sekitar cutoff.`,
+  phase: () => `<b>Respon fasa ∠H(ω)</b> di dalam passband: FIR berupa <b>garis lurus</b> (∠H = −ω·(M−1)/2), artinya semua frekuensi tertunda sama sehingga bentuk gelombang tidak berubah. IIR <b>melengkung</b> di sekitar cutoff (<i>phase dispersion</i>). Bagian stopband disembunyikan karena di sana magnitudonya sudah sangat kecil.`,
+  gd: () => `<b>Group delay</b> = −d∠H/dω, yaitu berapa sampel sebuah frekuensi tertunda. FIR <b>datar</b> di ${(state.taps - 1) / 2} sampel untuk semua frekuensi. IIR punya <b>puncak</b> di dekat frekuensi cutoff: frekuensi di sana tertunda lebih lama dari yang lain.`,
+  imp: () => `<b>Respon impuls h[n]</b> FIR adalah koefisien filternya sendiri: ${state.taps} nilai yang <b>simetris</b> terhadap titik tengah n = ${(state.taps - 1) / 2}. Simetri inilah yang membuat fasanya linear. IIR (oranye, 80 sampel pertama) responsnya <b>tidak pernah benar-benar berhenti</b> (Infinite Impulse Response), hanya meluruh.`,
+  pz: () => `<b>Diagram pole-zero.</b> FIR: semua ${state.taps - 1} pole berada di z = 0 sehingga <b>pasti stabil</b>. Zero-nya banyak yang duduk tepat di lingkaran satuan pada daerah stopband, di situlah frekuensi diredam total. IIR: ${sosIIR.length * 2} pole berada <b>di dalam</b> lingkaran satuan (|z| maks = ${fmt(maxPoleRadius(), 3)}), jadi stabil. Pole yang makin dekat ke lingkaran membuat lereng filter makin tajam.`
+};
+
+function drawAcad() {
+  const g = prep($('cvAcad')); if (!g) return;
+  const { ctx } = g;
+  const firW = state.arch === 'FIR' ? 2.6 : 1.5, iirW = state.arch === 'IIR' ? 2.6 : 1.5;
+  const firA = state.arch === 'FIR' ? 1 : 0.6, iirA = state.arch === 'IIR' ? 1 : 0.6;
+  const leg = $('acadLegend');
+  const lgFIR = `<span><i class="sw" style="background:var(--fir)"></i>FIR ${state.taps} taps${state.arch === 'FIR' ? ' (aktif)' : ''}</span>`;
+  const lgIIR = `<span><i class="sw" style="background:var(--iir)"></i>${iirName()}${state.arch === 'IIR' ? ' (aktif)' : ''}</span>`;
+  leg.innerHTML = lgFIR + lgIIR;
+  $('acadExplain').innerHTML = ACAD_TEXT[state.view]();
+
+  if (state.view === 'mag' || state.view === 'phase' || state.view === 'gd') {
+    const A = responseCurve('FIR'), B = responseCurve('IIR');
+    const masked = (r, arr) => arr.map((v, i) => r.mag[i] > -20 ? v : null);
+    if (state.view === 'mag') {
+      const f = frame(g, { x0: 0, x1: 8000, y0: -90, y1: 5, xt: F_TICKS, xf: kHz, yt: [-80, -60, -40, -20, -3, 0].filter(v => v !== -3), yf: v => `${v} dB` });
+      shadePassband(ctx, f.X, f.T, f.ph);
+      ctx.save(); ctx.strokeStyle = css('--axis'); ctx.globalAlpha = .5; ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(f.L, f.Y(-3)); ctx.lineTo(f.L + f.pw, f.Y(-3)); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = css('--axis'); ctx.fillText('−3 dB', f.L + f.pw - 34, f.Y(-3) - 4);
+      line(ctx, A.f, A.mag, f.X, f.Y, css('--fir'), firW, null, firA);
+      line(ctx, B.f, B.mag, f.X, f.Y, css('--iir'), iirW, null, iirA);
+      cutoffLines(ctx, f.X, f.T, f.ph);
+      f.done();
+    } else if (state.view === 'phase') {
+      const pa = masked(A, A.ph), pb = masked(B, B.ph);
+      const vals = [...pa, ...pb].filter(v => v !== null);
+      const lo = Math.floor(Math.min(...vals) / 180) * 180, hi = Math.ceil(Math.max(...vals, 0) / 180) * 180;
+      const yt = []; const st = (hi - lo) > 2160 ? 720 : (hi - lo) > 1080 ? 360 : 180;
+      for (let v = lo; v <= hi; v += st) yt.push(v);
+      const f = frame(g, { x0: 0, x1: 8000, y0: lo, y1: hi, xt: F_TICKS, xf: kHz, yt, yf: v => `${v}°`, left: 52 });
+      shadePassband(ctx, f.X, f.T, f.ph);
+      line(ctx, A.f, pa, f.X, f.Y, css('--fir'), firW, null, firA);
+      line(ctx, B.f, pb, f.X, f.Y, css('--iir'), iirW, null, iirA);
+      f.done();
+    } else {
+      const ga = masked(A, A.gd), gb = masked(B, B.gd);
+      const vals = [...ga, ...gb].filter(v => v !== null && isFinite(v));
+      const hi = Math.max(10, Math.ceil(Math.max(...vals) / 10) * 10 + 5);
+      const st = hi > 100 ? 25 : hi > 50 ? 10 : 5;
+      const yt = []; for (let v = 0; v <= hi; v += st) yt.push(v);
+      const f = frame(g, { x0: 0, x1: 8000, y0: 0, y1: hi, xt: F_TICKS, xf: kHz, yt, yf: v => `${v}`, yl: 'sampel', left: 48 });
+      shadePassband(ctx, f.X, f.T, f.ph);
+      line(ctx, A.f, ga, f.X, f.Y, css('--fir'), firW, null, firA);
+      line(ctx, B.f, gb, f.X, f.Y, css('--iir'), iirW, null, iirA);
+      cutoffLines(ctx, f.X, f.T, f.ph);
+      f.done();
+    }
+  } else if (state.view === 'imp') {
+    const M = hFIR.length, K = 80;
+    const imp = new Float32Array(K); imp[0] = 1;
+    const hI = applySOS(imp, sosIIR);
+    const all = [...hFIR, ...hI];
+    const peak = Math.max(...all.map(Math.abs)) * 1.15;
+    const nMax = Math.max(K, M) - 1;
+    const xt = []; for (let v = 0; v <= nMax; v += 10) xt.push(v);
+    const f = frame(g, { x0: -1, x1: nMax + 1, y0: -peak, y1: peak, xt, xf: v => `${v}`, yt: [-peak / 1.15 / 2, 0, peak / 1.15 / 2], yf: v => fmt(v, 2), left: 48 });
+    const stem = (arr, color, alpha, r) => {
+      ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 1.3;
+      for (let n = 0; n < arr.length; n++) { const x = f.X(n), y = f.Y(arr[n]); ctx.beginPath(); ctx.moveTo(x, f.Y(0)); ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+      ctx.restore();
     };
+    stem(hI, css('--iir'), iirA * 0.8, 2);
+    stem(hFIR, css('--fir'), firA, 2.6);
+    const c = (M - 1) / 2;
+    ctx.save(); ctx.strokeStyle = css('--purple'); ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(f.X(c), f.T); ctx.lineTo(f.X(c), f.T + f.ph); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = css('--purple'); ctx.fillText(`pusat simetri n = ${c}`, f.X(c) + 5, f.T + 12);
+    f.done();
+  } else {
+    drawPZ(g);
+  }
+}
 
-    // DOM Elements
-    const tabSrcMic = document.getElementById('tabSrcMic');
-    const tabSrcFile = document.getElementById('tabSrcFile');
-    const tabSrcSynth = document.getElementById('tabSrcSynth');
-    const paneMic = document.getElementById('paneMic');
-    const paneFile = document.getElementById('paneFile');
-    const paneSynth = document.getElementById('paneSynth');
-    const badgeSourceType = document.getElementById('badgeSourceType');
-
-    const btnStartRecord = document.getElementById('btnStartRecord');
-    const recStatus = document.getElementById('recStatus');
-    const recTimer = document.getElementById('recTimer');
-    const recSuccessMsg = document.getElementById('recSuccessMsg');
-    const inputAudioFile = document.getElementById('inputAudioFile');
-    const fileNameLabel = document.getElementById('fileNameLabel');
-
-    const chkLoopAudio = document.getElementById('chkLoopAudio');
-    const btnPlayClean = document.getElementById('btnPlayClean');
-    const btnPlayNoisy = document.getElementById('btnPlayNoisy');
-    const btnPlayFiltered = document.getElementById('btnPlayFiltered');
-    const btnStopAudio = document.getElementById('btnStopAudio');
-    const metricPlayStatus = document.getElementById('metricPlayStatus');
-
-    const chkEnableNoise = document.getElementById('chkEnableNoise');
-    const lblNoiseToggleText = document.getElementById('lblNoiseToggleText');
-    const paneNoiseControls = document.getElementById('paneNoiseControls');
-    const noteNoiseMic = document.getElementById('noteNoiseMic');
-    const selNoiseType = document.getElementById('selNoiseType');
-    const sliderNoiseAmp = document.getElementById('sliderNoiseAmp');
-    const lblNoiseAmp = document.getElementById('lblNoiseAmp');
-
-    const btnModeBPF = document.getElementById('btnModeBPF');
-    const btnModeLPF = document.getElementById('btnModeLPF');
-    const btnModeHPF = document.getElementById('btnModeHPF');
-    const containerSingleCutoff = document.getElementById('containerSingleCutoff');
-    const containerDualCutoff = document.getElementById('containerDualCutoff');
-    const lblCutoffTitle = document.getElementById('lblCutoffTitle');
-    const sliderCutoff = document.getElementById('sliderCutoff');
-    const lblCutoff = document.getElementById('lblCutoff');
-    const sliderCutoffLow = document.getElementById('sliderCutoffLow');
-    const lblCutoffLow = document.getElementById('lblCutoffLow');
-    const sliderCutoffHigh = document.getElementById('sliderCutoffHigh');
-    const lblCutoffHigh = document.getElementById('lblCutoffHigh');
-
-    const btnTypeFIR = document.getElementById('btnTypeFIR');
-    const btnTypeIIR = document.getElementById('btnTypeIIR');
-    const sliderTaps = document.getElementById('sliderTaps');
-    const lblTapsVal = document.getElementById('lblTapsVal');
-    const containerTaps = document.getElementById('containerTaps');
-
-    const tabAcadBode = document.getElementById('tabAcadBode');
-    const tabAcadPhase = document.getElementById('tabAcadPhase');
-    const tabAcadZPlane = document.getElementById('tabAcadZPlane');
-    const academicExplanation = document.getElementById('academicExplanation');
-
-    const btnDownloadWAV = document.getElementById('btnDownloadWAV');
-    const btnDownloadPNG = document.getElementById('btnDownloadPNG');
-
-    const btnPresetVoice = document.getElementById('btnPresetVoice');
-    const btnPresetHiss = document.getElementById('btnPresetHiss');
-    const btnPresetHum = document.getElementById('btnPresetHum');
-
-    const metricAudioSource = document.getElementById('metricAudioSource');
-    const metricAudioSub = document.getElementById('metricAudioSub');
-    const metricPassband = document.getElementById('metricPassband');
-    const metricSnrGain = document.getElementById('metricSnrGain');
-    const metricPhaseType = document.getElementById('metricPhaseType');
-    const metricPhaseSub = document.getElementById('metricPhaseSub');
-
-    const canvasTime = document.getElementById('canvasTime');
-    const canvasFreq = document.getElementById('canvasFreq');
-    const canvasAcademic = document.getElementById('canvasAcademic');
-
-    // --- TAB SWITCHER FOR AUDIO SOURCE ---
-    tabSrcMic.addEventListener('click', () => {
-      currentSourceMode = 'mic';
-      tabSrcMic.className = "p-2 rounded-lg border-2 border-emerald-500 bg-emerald-500/15 text-emerald-500 font-bold flex flex-col items-center justify-center gap-0.5 transition-all shadow-xs cursor-pointer";
-      tabSrcFile.className = "p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer";
-      tabSrcSynth.className = "p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer";
-      paneMic.classList.remove('hidden');
-      paneFile.classList.add('hidden');
-      paneSynth.classList.add('hidden');
-      badgeSourceType.textContent = "Mikrofon";
-      metricAudioSource.textContent = "Mikrofon Sendiri";
-
-      state.enableNoise = false;
-      chkEnableNoise.checked = false;
-      updateNoiseUI();
-      onParamChanged();
+function drawPZ(g) {
+  const { ctx, w, h } = g;
+  const key = `${state.taps}|${state.mode}|${state.fc}|${state.fLow}|${state.fHigh}`;
+  if (pzCache.key !== key) pzCache = { key, zeros: polyRoots(hFIR) };
+  const iirZ = [], iirP = [];
+  sosIIR.forEach(s => { iirZ.push(...quadRoots(s.b[0], s.b[1], s.b[2])); iirP.push(...quadRoots(1, s.a[1], s.a[2])); });
+  const panels = [
+    { title: `FIR (${state.taps} taps)`, color: css('--fir'), zeros: pzCache.zeros, poles: [[0, 0]], poleLabel: `${state.taps - 1}×`, act: state.arch === 'FIR' },
+    { title: iirName(), color: css('--iir'), zeros: iirZ, poles: iirP, act: state.arch === 'IIR' }
+  ];
+  const VIEW = 1.6;
+  panels.forEach((p, k) => {
+    const cx = w * (k === 0 ? 0.27 : 0.73), cy = h / 2 + 8;
+    const R = Math.min(w * 0.2, (h - 50) / 2) / VIEW * 1.0;
+    ctx.save(); ctx.globalAlpha = p.act ? 1 : 0.7;
+    ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx - R * VIEW, cy); ctx.lineTo(cx + R * VIEW, cy); ctx.moveTo(cx, cy - R * VIEW); ctx.lineTo(cx, cy + R * VIEW); ctx.stroke();
+    ctx.strokeStyle = css('--axis'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = p.act ? css('--fg') : css('--axis'); ctx.font = '600 12px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(p.title + (p.act ? ' · aktif' : ''), cx, 16);
+    ctx.font = '10.5px system-ui, sans-serif'; ctx.fillStyle = css('--axis');
+    ctx.fillText('|z| = 1', cx + R * 0.72, cy - R * 0.72 - 4);
+    ctx.textAlign = 'left';
+    let outside = 0;
+    p.zeros.forEach(([re, im]) => {
+      if (Math.hypot(re, im) > VIEW) { outside++; return; }
+      ctx.strokeStyle = p.color; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(cx + re * R, cy - im * R, 4, 0, 7); ctx.stroke();
     });
-
-    tabSrcFile.addEventListener('click', () => {
-      currentSourceMode = 'file';
-      tabSrcFile.className = "p-2 rounded-lg border-2 border-blue-500 bg-blue-500/15 text-blue-500 font-bold flex flex-col items-center justify-center gap-0.5 transition-all shadow-xs cursor-pointer";
-      tabSrcMic.className = "p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer";
-      tabSrcSynth.className = "p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer";
-      paneFile.classList.remove('hidden');
-      paneMic.classList.add('hidden');
-      paneSynth.classList.add('hidden');
-      badgeSourceType.textContent = "File Audio";
-      metricAudioSource.textContent = "File Audio Eksternal";
-
-      state.enableNoise = false;
-      chkEnableNoise.checked = false;
-      updateNoiseUI();
-      onParamChanged();
+    p.poles.forEach(([re, im]) => {
+      const x = cx + re * R, y = cy - im * R;
+      ctx.strokeStyle = css('--noisy'); ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 5, y + 5); ctx.moveTo(x - 5, y + 5); ctx.lineTo(x + 5, y - 5); ctx.stroke();
     });
+    if (p.poleLabel) { ctx.fillStyle = css('--noisy'); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillText(p.poleLabel, cx + 7, cy - 7); }
+    ctx.fillStyle = css('--axis'); ctx.font = '10.5px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`○ zero  × pole${outside ? `  (${outside} zero di luar gambar)` : ''}`, cx, h - 6);
+    ctx.restore();
+  });
+}
 
-    tabSrcSynth.addEventListener('click', () => {
-      currentSourceMode = 'synth';
-      tabSrcSynth.className = "p-2 rounded-lg border-2 border-blue-500 bg-blue-500/15 text-blue-500 font-bold flex flex-col items-center justify-center gap-0.5 transition-all shadow-xs cursor-pointer";
-      tabSrcMic.className = "p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer";
-      tabSrcFile.className = "p-2 rounded-lg border-2 border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer";
-      paneSynth.classList.remove('hidden');
-      paneMic.classList.add('hidden');
-      paneFile.classList.add('hidden');
-      badgeSourceType.textContent = "Sintetis";
-      metricAudioSource.textContent = "Sintetis Tone";
+function drawAll() { drawTime(); drawFFT(); drawBands(); drawAcad(); drawSweep(); }
 
-      state.enableNoise = true;
-      chkEnableNoise.checked = true;
-      updateNoiseUI();
-      generateBaseSynth();
-      onParamChanged();
-    });
+// =====================================================================
+//  AUDIO
+// =====================================================================
+let audioCtx = null, activeSrc = null, isPlaying = false, playStart = 0, track = 'filtered';
+function ctxAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: FS });
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function trackBuffer() { return track === 'clean' ? clean : track === 'noisy' ? noisy : filtered; }
+function startSource(arr, offset) {
+  const ac = ctxAudio();
+  const buf = ac.createBuffer(1, arr.length, FS), ch = buf.getChannelData(0);
+  for (let i = 0; i < arr.length; i++) ch[i] = Math.max(-0.95, Math.min(0.95, arr[i]));
+  const src = ac.createBufferSource();
+  src.buffer = buf; src.loop = $('chkLoop').checked; src.connect(ac.destination);
+  src.start(0, offset);
+  if (activeSrc) { activeSrc.onended = null; try { activeSrc.stop(); } catch (e) {} }
+  activeSrc = src; playStart = ac.currentTime - offset;
+  src.onended = () => { if (activeSrc === src) stopAudio(); };
+}
+function play(t) {
+  track = t; isPlaying = true;
+  startSource(trackBuffer(), 0);
+  renderPlayer();
+}
+function hotSwap() {
+  if (!isPlaying || !audioCtx) return;
+  const offset = (audioCtx.currentTime - playStart) % SECONDS;
+  startSource(trackBuffer(), offset);
+}
+function stopAudio() {
+  if (activeSrc) { activeSrc.onended = null; try { activeSrc.stop(); } catch (e) {} activeSrc = null; }
+  isPlaying = false; renderPlayer();
+}
+const TRACK_NAME = { clean: 'Sinyal asli', noisy: 'Sinyal + noise', filtered: 'Hasil filter' };
+function renderPlayer() {
+  document.querySelectorAll('[data-track]').forEach(b => b.classList.toggle('on', isPlaying && b.dataset.track === track));
+  $('playStatus').textContent = isPlaying ? `▶ Memutar: ${TRACK_NAME[track]}` : '⏹ Berhenti';
+  $('playStatus').classList.toggle('on', isPlaying);
+}
 
-    function updateNoiseUI() {
-      if (state.enableNoise) {
-        lblNoiseToggleText.textContent = "Aktif";
-        lblNoiseToggleText.className = "text-red-500 font-bold";
-        paneNoiseControls.classList.remove('opacity-40', 'pointer-events-none');
-        metricAudioSub.textContent = "Injeksi noise aktif (3.0s)";
-      } else {
-        lblNoiseToggleText.textContent = "Mati";
-        lblNoiseToggleText.className = "text-gray-400 font-medium";
-        paneNoiseControls.classList.add('opacity-40', 'pointer-events-none');
-        metricAudioSub.textContent = (currentSourceMode === 'mic') ? "Noise alami bawaan mic (3.0s)" : "Murni sinyal bersih (3.0s)";
-      }
-
-      if (currentSourceMode === 'mic') {
-        noteNoiseMic.classList.remove('hidden');
-      } else {
-        noteNoiseMic.classList.add('hidden');
-      }
-    }
-
-    chkEnableNoise.addEventListener('change', (e) => {
-      state.enableNoise = e.target.checked;
-      updateNoiseUI();
-      onParamChanged();
-    });
-
-    function generateBaseSynth() {
-      for (let n = 0; n < TOTAL_SAMPLES; n++) {
-        const t = n / FS;
-        const env = 0.8 + 0.2 * Math.sin(2 * Math.PI * 3 * t);
-        cleanBuffer[n] = env * (0.65 * Math.sin(2 * Math.PI * 440 * t) + 0.35 * Math.sin(2 * Math.PI * 880 * t));
-      }
-    }
-
-    // --- MICROPHONE RECORDING (EXACT 3.0 SECONDS) ---
-    btnStartRecord.addEventListener('click', async () => {
+// Rekam mic & upload file
+function useRecorded(audioBuffer, kind) {
+  const data = audioBuffer.getChannelData(0), step = audioBuffer.sampleRate / FS;
+  const out = new Float32Array(N);
+  let peak = 1e-3;
+  for (let i = 0; i < N; i++) { const j = Math.floor(i * step); out[i] = j < data.length ? data[j] : 0; peak = Math.max(peak, Math.abs(out[i])); }
+  const gain = Math.min(8, 0.75 / peak);
+  for (let i = 0; i < N; i++) out[i] *= gain;
+  recorded[kind] = out;
+  state.source = kind; state.noiseOn = false;
+  loadSourceBuffer(); update();
+}
+$('btnRec').addEventListener('click', async () => {
+  const btn = $('btnRec');
+  try {
+    const ac = ctxAudio();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: false, echoCancellation: false, autoGainControl: false } });
+    const rec = new MediaRecorder(stream), chunks = [];
+    btn.disabled = true;
+    let left = 3; btn.textContent = `🎙️ Bicara sekarang… ${left}`;
+    const tick = setInterval(() => { left--; if (left > 0) btn.textContent = `🎙️ Bicara sekarang… ${left}`; }, 1000);
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = async () => {
+      clearInterval(tick);
+      stream.getTracks().forEach(t => t.stop());
       try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: FS });
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { noiseSuppression: false, echoCancellation: false, autoGainControl: false }
-        });
-
-        const mediaRecorder = new MediaRecorder(stream);
-        const chunks = [];
-        
-        btnStartRecord.disabled = true;
-        btnStartRecord.className = "w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-gray-500 text-white cursor-not-allowed";
-        recStatus.classList.remove('hidden');
-        recSuccessMsg.classList.add('hidden');
-
-        let secondsLeft = 3;
-        recTimer.textContent = secondsLeft;
-        const countdown = setInterval(() => {
-          secondsLeft--;
-          recTimer.textContent = secondsLeft;
-          if (secondsLeft <= 0) clearInterval(countdown);
-        }, 1000);
-
-        mediaRecorder.ondataavailable = e => chunks.push(e.data);
-        mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach(t => t.stop());
-          const blob = new Blob(chunks, { type: 'audio/webm' });
-          const arrayBuf = await blob.arrayBuffer();
-          
-          const decoded = await audioCtx.decodeAudioData(arrayBuf);
-          processLoadedAudio(decoded);
-
-          btnStartRecord.disabled = false;
-          btnStartRecord.className = "w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-red-500 hover:bg-red-600 text-white transition-all flex items-center justify-center gap-2 cursor-pointer";
-          recStatus.classList.add('hidden');
-          recSuccessMsg.classList.remove('hidden');
-        };
-
-        mediaRecorder.start();
-        setTimeout(() => {
-          if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-        }, 3000);
-
-      } catch (err) {
-        alert("Gagal mengakses mikrofon: " + err.message);
-        btnStartRecord.disabled = false;
-        btnStartRecord.className = "w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-red-500 text-white";
-        recStatus.classList.add('hidden');
-      }
-    });
-
-    inputAudioFile.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      fileNameLabel.textContent = `Memuat: ${file.name}...`;
-
-      try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: FS });
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-        const arrayBuf = await file.arrayBuffer();
-        const decoded = await audioCtx.decodeAudioData(arrayBuf);
-        processLoadedAudio(decoded);
-        fileNameLabel.textContent = `✓ ${file.name} (${decoded.duration.toFixed(1)}s, ${decoded.sampleRate}Hz)`;
-      } catch (err) {
-        alert("Gagal membaca audio file: " + err.message);
-        fileNameLabel.textContent = "Gagal memuat file.";
-      }
-    });
-
-    function processLoadedAudio(audioBuffer) {
-      const origData = audioBuffer.getChannelData(0);
-      const srcRate = audioBuffer.sampleRate;
-      const step = srcRate / FS;
-
-      let maxVal = 0.001;
-      for (let i = 0; i < TOTAL_SAMPLES; i++) {
-        const srcIdx = Math.floor(i * step);
-        const val = srcIdx < origData.length ? origData[srcIdx] : 0;
-        cleanBuffer[i] = val;
-        if (Math.abs(val) > maxVal) maxVal = Math.abs(val);
-      }
-
-      const targetGain = Math.min(1.0, 0.75 / maxVal);
-      for (let i = 0; i < TOTAL_SAMPLES; i++) {
-        cleanBuffer[i] *= targetGain;
-      }
-
-      onParamChanged();
-    }
-
-    // --- PRESET CEPAT HANDLER (HIGHLIGHT HIJAU OTOMATIS BERPINDAH) ---
-    function setActivePreset(activeBtn) {
-      if (!btnPresetVoice || !btnPresetHiss || !btnPresetHum) return;
-      [btnPresetVoice, btnPresetHiss, btnPresetHum].forEach(b => {
-        b.classList.remove('active');
-      });
-      if (activeBtn) {
-        activeBtn.classList.add('active');
-      }
-    }
-
-    btnPresetVoice.addEventListener('click', () => {
-      setActivePreset(btnPresetVoice);
-      setFilterMode('bandpass');
-      state.cutoffLow = 150;
-      state.cutoffHigh = 3500;
-      sliderCutoffLow.value = 150;
-      sliderCutoffHigh.value = 3500;
-      lblCutoffLow.textContent = '150 Hz';
-      lblCutoffHigh.textContent = '3500 Hz';
-      onParamChanged();
-    });
-
-    btnPresetHiss.addEventListener('click', () => {
-      setActivePreset(btnPresetHiss);
-      setFilterMode('lowpass');
-      state.cutoff = 3000;
-      sliderCutoff.value = 3000;
-      lblCutoff.textContent = '3000 Hz';
-      onParamChanged();
-    });
-
-    btnPresetHum.addEventListener('click', () => {
-      setActivePreset(btnPresetHum);
-      setFilterMode('highpass');
-      state.cutoff = 200;
-      sliderCutoff.value = 200;
-      lblCutoff.textContent = '200 Hz';
-      onParamChanged();
-    });
-
-    // --- FILTER MODE SWITCHERS ---
-    function setFilterMode(mode) {
-      state.filterMode = mode;
-      [btnModeBPF, btnModeLPF, btnModeHPF].forEach(btn => {
-        btn.className = "py-1.5 px-2 rounded-lg font-medium border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] transition-colors cursor-pointer";
-      });
-
-      if (mode === 'bandpass') {
-        btnModeBPF.className = "py-1.5 px-2 rounded-lg font-semibold border border-emerald-500 bg-emerald-500/10 text-emerald-500 transition-colors cursor-pointer";
-        containerSingleCutoff.classList.add('hidden');
-        containerDualCutoff.classList.remove('hidden');
-        metricPassband.textContent = `${state.cutoffLow} – ${state.cutoffHigh} Hz`;
-      } else if (mode === 'lowpass') {
-        btnModeLPF.className = "py-1.5 px-2 rounded-lg font-semibold border border-blue-500 bg-blue-500/10 text-blue-500 transition-colors cursor-pointer";
-        containerSingleCutoff.classList.remove('hidden');
-        containerDualCutoff.classList.add('hidden');
-        lblCutoffTitle.textContent = "Frekuensi Cutoff LPF (fc):";
-        metricPassband.textContent = `0 – ${state.cutoff} Hz`;
-      } else if (mode === 'highpass') {
-        btnModeHPF.className = "py-1.5 px-2 rounded-lg font-semibold border border-blue-500 bg-blue-500/10 text-blue-500 transition-colors cursor-pointer";
-        containerSingleCutoff.classList.remove('hidden');
-        containerDualCutoff.classList.add('hidden');
-        lblCutoffTitle.textContent = "Frekuensi Cutoff HPF (fc):";
-        metricPassband.textContent = `${state.cutoff} – 8,000 Hz`;
-      }
-      onParamChanged();
-    }
-
-    btnModeBPF.addEventListener('click', () => {
-      setActivePreset(btnPresetVoice);
-      setFilterMode('bandpass');
-    });
-    btnModeLPF.addEventListener('click', () => {
-      setActivePreset(btnPresetHiss);
-      setFilterMode('lowpass');
-    });
-    btnModeHPF.addEventListener('click', () => {
-      setActivePreset(btnPresetHum);
-      setFilterMode('highpass');
-    });
-
-    sliderCutoff.addEventListener('input', (e) => {
-      state.cutoff = parseInt(e.target.value);
-      lblCutoff.textContent = state.cutoff + ' Hz';
-      metricPassband.textContent = (state.filterMode === 'lowpass') ? `0 – ${state.cutoff} Hz` : `${state.cutoff} – 8,000 Hz`;
-      onParamChanged();
-    });
-
-    sliderCutoffLow.addEventListener('input', (e) => {
-      state.cutoffLow = parseInt(e.target.value);
-      if (state.cutoffLow >= state.cutoffHigh) state.cutoffLow = state.cutoffHigh - 100;
-      lblCutoffLow.textContent = state.cutoffLow + ' Hz';
-      metricPassband.textContent = `${state.cutoffLow} – ${state.cutoffHigh} Hz`;
-      onParamChanged();
-    });
-
-    sliderCutoffHigh.addEventListener('input', (e) => {
-      state.cutoffHigh = parseInt(e.target.value);
-      if (state.cutoffHigh <= state.cutoffLow) state.cutoffHigh = state.cutoffLow + 100;
-      lblCutoffHigh.textContent = state.cutoffHigh + ' Hz';
-      metricPassband.textContent = `${state.cutoffLow} – ${state.cutoffHigh} Hz`;
-      onParamChanged();
-    });
-
-    btnTypeFIR.addEventListener('click', () => {
-      state.filterArch = 'FIR';
-      btnTypeFIR.className = 'py-1.5 px-3 rounded-lg text-xs font-semibold border border-blue-500 bg-blue-500/10 text-blue-500 transition-colors cursor-pointer';
-      btnTypeIIR.className = 'py-1.5 px-3 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] transition-colors cursor-pointer';
-      containerTaps.style.display = 'block';
-      metricPhaseType.textContent = "Linear Phase";
-      metricPhaseType.className = "text-base font-bold text-purple-500";
-      metricPhaseSub.textContent = `Delay konstan: ${(state.taps - 1)/2} sampel`;
-      onParamChanged();
-    });
-
-    btnTypeIIR.addEventListener('click', () => {
-      state.filterArch = 'IIR';
-      btnTypeIIR.className = 'py-1.5 px-3 rounded-lg text-xs font-semibold border border-blue-500 bg-blue-500/10 text-blue-500 transition-colors cursor-pointer';
-      btnTypeFIR.className = 'py-1.5 px-3 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] transition-colors cursor-pointer';
-      containerTaps.style.display = 'none';
-      metricPhaseType.textContent = "Non-Linear Phase";
-      metricPhaseType.className = "text-base font-bold text-amber-500";
-      metricPhaseSub.textContent = "Phase dispersion di sekitar cutoff";
-      onParamChanged();
-    });
-
-    sliderTaps.addEventListener('input', (e) => {
-      state.taps = parseInt(e.target.value);
-      lblTapsVal.textContent = state.taps + ' Taps';
-      metricPhaseSub.textContent = `Delay konstan: ${(state.taps - 1)/2} sampel`;
-      onParamChanged();
-    });
-
-    sliderNoiseAmp.addEventListener('input', (e) => {
-      state.noiseAmp = parseFloat(e.target.value);
-      lblNoiseAmp.textContent = state.noiseAmp.toFixed(2);
-      onParamChanged();
-    });
-
-    selNoiseType.addEventListener('change', (e) => {
-      state.noiseType = e.target.value;
-      onParamChanged();
-    });
-
-    chkLoopAudio.addEventListener('change', (e) => {
-      loopEnabled = e.target.checked;
-      if (activeSource) activeSource.loop = loopEnabled;
-    });
-
-    // --- ACADEMIC TABS SWITCHER ---
-    function setAcademicTab(mode) {
-      academicChartMode = mode;
-      [tabAcadBode, tabAcadPhase, tabAcadZPlane].forEach(b => {
-        b.className = "px-2.5 py-1 rounded-md font-medium border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all cursor-pointer";
-      });
-
-      if (mode === 'bode') {
-        tabAcadBode.className = "px-2.5 py-1 rounded-md font-semibold bg-purple-500 text-white transition-all cursor-pointer";
-        academicExplanation.innerHTML = `<strong class="text-purple-500 font-semibold">Respon Magnitudo |H(ω)| (Bode Plot):</strong> Memperlihatkan batas redaman pita henti (<em>stopband attenuation</em>) murni dari filter tanpa bergantung pada sinyal audio input.`;
-      } else if (mode === 'phase') {
-        tabAcadPhase.className = "px-2.5 py-1 rounded-md font-semibold bg-purple-500 text-white transition-all cursor-pointer";
-        if (state.filterArch === 'FIR') {
-          academicExplanation.innerHTML = `<strong class="text-emerald-500 font-semibold">Respon Fasa FIR (Linear Phase):</strong> Grafik berupa <strong>garis lurus murni</strong> (∠H(ω) = -α · ω). Ini bukti bahwa semua komponen frekuensi suara tertunda dengan waktu yang sama persis (bebas distorsi fasa).`;
-        } else {
-          academicExplanation.innerHTML = `<strong class="text-amber-500 font-semibold">Respon Fasa IIR (Non-Linear):</strong> Grafik <strong>melengkung tajam</strong> di sekitar frekuensi cutoff. Menunjukkan bahwa frekuensi tinggi tertunda lebih lambat daripada frekuensi rendah (<em>phase dispersion</em>).`;
-        }
-      } else if (mode === 'zplane') {
-        tabAcadZPlane.className = "px-2.5 py-1 rounded-md font-semibold bg-purple-500 text-white transition-all cursor-pointer";
-        if (state.filterArch === 'FIR') {
-          academicExplanation.innerHTML = `<strong class="text-blue-500 font-semibold">Diagram Pole-Zero FIR:</strong> Semua kutub (poles ×) bertumpuk di titik origin z = 0. Ini adalah bukti matematis bahwa filter FIR <strong>pasti 100% stabil</strong> (<em>unconditionally stable</em>).`;
-        } else {
-          academicExplanation.innerHTML = `<strong class="text-emerald-500 font-semibold">Diagram Pole-Zero IIR:</strong> Semua kutub (poles ×) berada <strong>di dalam lingkaran satuan (|z| &lt; 1)</strong>, membuktikan filter Butterworth stabil tanpa osilasi tak terkendali.`;
-        }
-      }
-      drawAcademicChart();
-    }
-
-    tabAcadBode.addEventListener('click', () => setAcademicTab('bode'));
-    tabAcadPhase.addEventListener('click', () => setAcademicTab('phase'));
-    tabAcadZPlane.addEventListener('click', () => setAcademicTab('zplane'));
-
-    // --- DSP ALGORITHMS ---
-    function computeNoisySignal() {
-      for (let n = 0; n < TOTAL_SAMPLES; n++) {
-        let val = cleanBuffer[n];
-        if (state.enableNoise) {
-          const t = n / FS;
-          let noise = 0;
-          if (state.noiseType === 'highfreq') {
-            noise = state.noiseAmp * Math.sin(2 * Math.PI * 4500 * t);
-          } else if (state.noiseType === 'white') {
-            const u1 = Math.max(1e-6, Math.random()), u2 = Math.random();
-            noise = state.noiseAmp * 0.45 * Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-          } else if (state.noiseType === 'lowfreq') {
-            noise = state.noiseAmp * Math.sin(2 * Math.PI * 120 * t);
-          } else if (state.noiseType === 'both_out') {
-            noise = (state.noiseAmp * 0.6) * Math.sin(2 * Math.PI * 120 * t) + 
-                    (state.noiseAmp * 0.6) * Math.sin(2 * Math.PI * 5000 * t);
-          }
-          val += noise;
-        }
-        noisyBuffer[n] = val;
-      }
-    }
-
-    function designFIR(M, mode, fc, fcLow, fcHigh) {
-      const h = new Float32Array(M);
-      const center = (M - 1) / 2;
-
-      function sinc(f, n) {
-        if (n === 0) return 2 * Math.PI * f;
-        return Math.sin(2 * Math.PI * f * n) / n;
-      }
-
-      for (let i = 0; i < M; i++) {
-        const n = i - center;
-        let val = 0;
-        if (mode === 'lowpass') {
-          val = sinc(fc / FS, n);
-        } else if (mode === 'highpass') {
-          val = (n === 0 ? 1.0 : 0.0) - sinc(fc / FS, n);
-        } else if (mode === 'bandpass') {
-          val = sinc(fcHigh / FS, n) - sinc(fcLow / FS, n);
-        }
-        const w = 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (M - 1));
-        h[i] = val * w;
-      }
-
-      let sum = 0;
-      if (mode === 'lowpass') {
-        for (let i = 0; i < M; i++) sum += h[i];
-      } else if (mode === 'bandpass') {
-        const fCenter = (fcLow + fcHigh) / 2;
-        let cR = 0, cI = 0;
-        for (let i = 0; i < M; i++) {
-          const ang = -2 * Math.PI * fCenter * (i - center) / FS;
-          cR += h[i] * Math.cos(ang);
-          cI += h[i] * Math.sin(ang);
-        }
-        sum = Math.sqrt(cR * cR + cI * cI);
-      } else {
-        sum = 1.0;
-      }
-
-      if (sum > 1e-6) {
-        for (let i = 0; i < M; i++) h[i] /= sum;
-      }
-      return h;
-    }
-
-    function applyFIR(input, h) {
-      const M = h.length, N = input.length;
-      const out = new Float32Array(N);
-      for (let n = 0; n < N; n++) {
-        let acc = 0;
-        const kMax = Math.min(n, M - 1);
-        for (let k = 0; k <= kMax; k++) acc += h[k] * input[n - k];
-        out[n] = acc;
-      }
-      return out;
-    }
-
-    function applyIIR(input, mode, fc, fcLow, fcHigh) {
-      let current = new Float32Array(input);
-
-      if (mode === 'lowpass' || mode === 'highpass') {
-        const isHP = (mode === 'highpass');
-        const Qs = [0.5411961, 1.306563];
-        for (let stage = 0; stage < 2; stage++) {
-          const w0 = 2 * Math.PI * (fc / FS);
-          const alpha = Math.sin(w0) / (2 * Qs[stage]);
-          const cosw = Math.cos(w0);
-
-          let b0, b1, b2, a0, a1, a2;
-          if (!isHP) {
-            b0 = (1 - cosw) / 2; b1 = 1 - cosw; b2 = (1 - cosw) / 2;
-          } else {
-            b0 = (1 + cosw) / 2; b1 = -(1 + cosw); b2 = (1 + cosw) / 2;
-          }
-          a0 = 1 + alpha; a1 = -2 * cosw; a2 = 1 - alpha;
-          current = applyBiquad(current, b0/a0, b1/a0, b2/a0, a1/a0, a2/a0);
-        }
-      } else if (mode === 'bandpass') {
-        const f0 = Math.sqrt(fcLow * fcHigh);
-        const bw = Math.max(100, fcHigh - fcLow);
-        const Q = f0 / bw;
-        const w0 = 2 * Math.PI * (f0 / FS);
-        const alpha = Math.sin(w0) / (2 * Q);
-        const cosw = Math.cos(w0);
-
-        const b0 = alpha, b1 = 0, b2 = -alpha;
-        const a0 = 1 + alpha, a1 = -2 * cosw, a2 = 1 - alpha;
-        current = applyBiquad(current, b0/a0, b1/a0, b2/a0, a1/a0, a2/a0);
-        current = applyBiquad(current, b0/a0, b1/a0, b2/a0, a1/a0, a2/a0);
-      }
-      return current;
-    }
-
-    function applyBiquad(input, b0, b1, b2, a1, a2) {
-      const out = new Float32Array(input.length);
-      let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-      for (let n = 0; n < input.length; n++) {
-        const x0 = input[n];
-        const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-        out[n] = y0;
-        x2 = x1; x1 = x0;
-        y2 = y1; y1 = y0;
-      }
-      return out;
-    }
-
-    function computeFFT(realSlice) {
-      const N = 1024;
-      const real = new Float32Array(N), imag = new Float32Array(N);
-
-      for (let i = 0; i < N; i++) {
-        const win = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
-        real[i] = (i < realSlice.length ? realSlice[i] : 0) * win;
-      }
-
-      let j = 0;
-      for (let i = 0; i < N - 1; i++) {
-        if (i < j) { const tr = real[i]; real[i] = real[j]; real[j] = tr; }
-        let k = N >> 1;
-        while (k <= j) { j -= k; k >>= 1; }
-        j += k;
-      }
-
-      for (let len = 2; len <= N; len <<= 1) {
-        const half = len >> 1;
-        const angle = (-2 * Math.PI) / len;
-        const wStepR = Math.cos(angle), wStepI = Math.sin(angle);
-
-        for (let i = 0; i < N; i += len) {
-          let wr = 1, wi = 0;
-          for (let k = 0; k < half; k++) {
-            const uR = real[i + k], uI = imag[i + k];
-            const vR = real[i + k + half] * wr - imag[i + k + half] * wi;
-            const vI = real[i + k + half] * wi + imag[i + k + half] * wr;
-            real[i + k] = uR + vR; imag[i + k] = uI + vI;
-            real[i + k + half] = uR - vR; imag[i + k + half] = uI - vI;
-            const nWr = wr * wStepR - wi * wStepI;
-            wi = wr * wStepI + wi * wStepR; wr = nWr;
-          }
-        }
-      }
-
-      const magDB = new Float32Array(N / 2);
-      for (let i = 0; i < N / 2; i++) {
-        const mag = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]) / (N / 4);
-        magDB[i] = 20 * Math.log10(Math.max(mag, 1e-4));
-      }
-      return magDB;
-    }
-
-    function calculateSNR() {
-      let pClean = 0, pNoiseIn = 0, pNoiseOut = 0;
-      const start = 200, end = TOTAL_SAMPLES - 200, count = end - start;
-      const delay = (state.filterArch === 'FIR') ? Math.floor((state.taps - 1) / 2) : 2;
-
-      for (let i = start; i < end; i++) {
-        pClean += cleanBuffer[i] * cleanBuffer[i];
-        const diffIn = noisyBuffer[i] - cleanBuffer[i];
-        pNoiseIn += diffIn * diffIn;
-
-        const cRef = (i - delay >= 0) ? cleanBuffer[i - delay] : cleanBuffer[i];
-        const diffOut = filteredBuffer[i] - cRef;
-        pNoiseOut += diffOut * diffOut;
-      }
-
-      pClean /= count; pNoiseIn /= count; pNoiseOut /= count;
-      const snrIn = (pNoiseIn > 1e-9) ? 10 * Math.log10(pClean / pNoiseIn) : 40;
-      const snrOut = (pNoiseOut > 1e-9) ? 10 * Math.log10(pClean / pNoiseOut) : 40;
-      const gain = snrOut - snrIn;
-      metricSnrGain.textContent = (gain >= 0 ? '+' : '') + gain.toFixed(1);
-    }
-
-    // --- REAL-TIME PARAMETER CHANGE DISPATCHER ---
-    function onParamChanged() {
-      computeNoisySignal();
-
-      if (state.filterArch === 'FIR') {
-        const h = designFIR(state.taps, state.filterMode, state.cutoff, state.cutoffLow, state.cutoffHigh);
-        filteredBuffer = applyFIR(noisyBuffer, h);
-      } else {
-        filteredBuffer = applyIIR(noisyBuffer, state.filterMode, state.cutoff, state.cutoffLow, state.cutoffHigh);
-      }
-
-      calculateSNR();
-
-      let bestIdx = 2000, maxEnergy = 0;
-      for (let i = 1000; i < TOTAL_SAMPLES - 1500; i += 500) {
-        let e = 0;
-        for (let k = 0; k < 400; k++) e += cleanBuffer[i + k] * cleanBuffer[i + k];
-        if (e > maxEnergy) { maxEnergy = e; bestIdx = i; }
-      }
-
-      const sliceRaw = noisyBuffer.slice(bestIdx, bestIdx + 1024);
-      const sliceFilt = filteredBuffer.slice(bestIdx, bestIdx + 1024);
-      const sliceClean = cleanBuffer.slice(bestIdx, bestIdx + 1024);
-
-      drawTimeDomain(sliceClean, sliceRaw, sliceFilt);
-      drawFreqDomain(computeFFT(sliceRaw), computeFFT(sliceFilt));
-      drawAcademicChart();
-
-      if (isPlaying && audioCtx && activeSource) {
-        const currentBuf = (currentAuditionTrack === 'clean') ? cleanBuffer :
-                           (currentAuditionTrack === 'noisy') ? noisyBuffer : filteredBuffer;
-        hotSwapPlayingAudio(currentBuf);
-      }
-    }
-
-    function hotSwapPlayingAudio(floatArray) {
-      if (!audioCtx || !isPlaying) return;
-      const elapsed = audioCtx.currentTime - playStartTime;
-      const duration = floatArray.length / FS;
-      const offset = elapsed % duration;
-
-      const newBuf = audioCtx.createBuffer(1, floatArray.length, FS);
-      const channelData = newBuf.getChannelData(0);
-      for (let i = 0; i < floatArray.length; i++) {
-        channelData[i] = Math.max(-0.95, Math.min(0.95, floatArray[i]));
-      }
-
-      const newSource = audioCtx.createBufferSource();
-      newSource.buffer = newBuf;
-      newSource.loop = loopEnabled;
-      newSource.connect(audioCtx.destination);
-      newSource.start(0, offset);
-
-      if (activeSource) {
-        try { activeSource.stop(); } catch(e) {}
-      }
-      activeSource = newSource;
-      playStartTime = audioCtx.currentTime - offset;
-
-      newSource.onended = () => {
-        if (!loopEnabled) stopAudio();
-      };
-    }
-
-    // --- CANVAS DRAWING (TIME & FREQUENCY) ---
-    function drawTimeDomain(clean, noisy, filtered) {
-      const rect = canvasTime.getBoundingClientRect();
-      canvasTime.width = rect.width * window.devicePixelRatio;
-      canvasTime.height = rect.height * window.devicePixelRatio;
-      const ctx = canvasTime.getContext('2d');
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-      const w = rect.width, h = rect.height, midY = h / 2;
-      const isLight = document.documentElement.classList.contains('light');
-
-      ctx.clearRect(0, 0, w, h);
-
-      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, midY); ctx.lineTo(w, midY);
-      for (let x = 0; x <= w; x += w / 6) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
-      ctx.stroke();
-
-      const displayCount = 400;
-      const scaleY = h * 0.38;
-
-      if (state.enableNoise) {
-        ctx.strokeStyle = isLight ? 'rgba(239, 68, 68, 0.45)' : 'rgba(239, 68, 68, 0.55)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        for (let i = 0; i < displayCount; i++) {
-          const x = (i / (displayCount - 1)) * w;
-          const y = midY - (noisy[i] || 0) * scaleY;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      for (let i = 0; i < displayCount; i++) {
-        const x = (i / (displayCount - 1)) * w;
-        const y = midY - (clean[i] || 0) * scaleY;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      for (let i = 0; i < displayCount; i++) {
-        const x = (i / (displayCount - 1)) * w;
-        const y = midY - (filtered[i] || 0) * scaleY;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-
-    function drawFreqDomain(magRaw, magFilt) {
-      const rect = canvasFreq.getBoundingClientRect();
-      canvasFreq.width = rect.width * window.devicePixelRatio;
-      canvasFreq.height = rect.height * window.devicePixelRatio;
-      const ctx = canvasFreq.getContext('2d');
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-      const w = rect.width, h = rect.height;
-      const isLight = document.documentElement.classList.contains('light');
-
-      ctx.clearRect(0, 0, w, h);
-
-      const minDB = -60, maxDB = 10, dbRange = maxDB - minDB;
-
-      ctx.fillStyle = isLight ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.12)';
-      if (state.filterMode === 'lowpass') {
-        const xCut = (state.cutoff / (FS / 2)) * w;
-        ctx.fillRect(0, 0, xCut, h - 22);
-      } else if (state.filterMode === 'highpass') {
-        const xCut = (state.cutoff / (FS / 2)) * w;
-        ctx.fillRect(xCut, 0, w - xCut, h - 22);
-      } else if (state.filterMode === 'bandpass') {
-        const xLow = (state.cutoffLow / (FS / 2)) * w;
-        const xHigh = (state.cutoffHigh / (FS / 2)) * w;
-        ctx.fillRect(xLow, 0, xHigh - xLow, h - 22);
-      }
-
-      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
-      ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
-      ctx.font = '12px sans-serif';
-      ctx.lineWidth = 1;
-
-      const freqs = [1000, 2000, 3000, 4000, 5000, 6000, 7000];
-      freqs.forEach(f => {
-        const x = (f / (FS / 2)) * w;
-        ctx.beginPath();
-        ctx.moveTo(x, 0); ctx.lineTo(x, h - 18); ctx.stroke();
-        ctx.fillText(f + 'Hz', x - 18, h - 4);
-      });
-
-      function getY(db) {
-        const clamped = Math.max(minDB, Math.min(maxDB, db));
-        return (1 - (clamped - minDB) / dbRange) * (h - 22);
-      }
-
-      ctx.strokeStyle = isLight ? 'rgba(239, 68, 68, 0.5)' : 'rgba(239, 68, 68, 0.65)';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      for (let i = 0; i < magRaw.length; i++) {
-        const x = (i / (magRaw.length - 1)) * w;
-        const y = getY(magRaw[i]);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      for (let i = 0; i < magFilt.length; i++) {
-        const x = (i / (magFilt.length - 1)) * w;
-        const y = getY(magFilt[i]);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
-
-      if (state.filterMode === 'bandpass') {
-        const x1 = (state.cutoffLow / (FS / 2)) * w;
-        const x2 = (state.cutoffHigh / (FS / 2)) * w;
-        ctx.beginPath(); ctx.moveTo(x1, 0); ctx.lineTo(x1, h - 22); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x2, 0); ctx.lineTo(x2, h - 22); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#10b981';
-        ctx.fillText(`Passband: ${state.cutoffLow}-${state.cutoffHigh}Hz`, Math.min(x1 + 4, w - 170), 18);
-      } else {
-        const x = (state.cutoff / (FS / 2)) * w;
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h - 22); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#10b981';
-        ctx.fillText(`fc: ${state.cutoff}Hz`, Math.min(x + 4, w - 85), 18);
-      }
-    }
-
-    // --- DRAW ADVANCED ACADEMIC CHARTS (BODE, PHASE & Z-PLANE) ---
-    function drawAcademicChart() {
-      const rect = canvasAcademic.getBoundingClientRect();
-      canvasAcademic.width = rect.width * window.devicePixelRatio;
-      canvasAcademic.height = rect.height * window.devicePixelRatio;
-      const ctx = canvasAcademic.getContext('2d');
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-      const w = rect.width, h = rect.height;
-      const isLight = document.documentElement.classList.contains('light');
-      ctx.clearRect(0, 0, w, h);
-
-      if (academicChartMode === 'bode' || academicChartMode === 'phase') {
-        // Calculate theoretical filter frequency response H(w) across 200 frequency bins
-        const bins = 200;
-        const mags = new Float32Array(bins);
-        const phases = new Float32Array(bins);
-
-        const h_fir = (state.filterArch === 'FIR') ? designFIR(state.taps, state.filterMode, state.cutoff, state.cutoffLow, state.cutoffHigh) : null;
-        const center = (state.taps - 1) / 2;
-
-        for (let i = 0; i < bins; i++) {
-          const freq = (i / (bins - 1)) * (FS / 2);
-          const omega = 2 * Math.PI * (freq / FS);
-
-          if (state.filterArch === 'FIR') {
-            // FIR H(w)
-            let r = 0, im = 0;
-            for (let k = 0; k < h_fir.length; k++) {
-              r += h_fir[k] * Math.cos(-omega * k);
-              im += h_fir[k] * Math.sin(-omega * k);
-            }
-            const mag = Math.sqrt(r * r + im * im);
-            mags[i] = 20 * Math.log10(Math.max(mag, 1e-4));
-            // Linear phase slope = -center * omega
-            phases[i] = -center * omega;
-          } else {
-            // IIR Butterworth approximation response
-            let gain = 1.0;
-            if (state.filterMode === 'lowpass') {
-              gain = 1 / Math.sqrt(1 + Math.pow(freq / Math.max(1, state.cutoff), 8));
-            } else if (state.filterMode === 'highpass') {
-              gain = 1 / Math.sqrt(1 + Math.pow(state.cutoff / Math.max(1, freq), 8));
-            } else {
-              const bw = Math.max(50, state.cutoffHigh - state.cutoffLow);
-              const f0 = Math.sqrt(state.cutoffLow * state.cutoffHigh);
-              gain = 1 / Math.sqrt(1 + Math.pow((freq * freq - f0 * f0) / (freq * bw + 1e-6), 4));
-            }
-            mags[i] = 20 * Math.log10(Math.max(gain, 1e-4));
-            // Non-linear phase curve
-            phases[i] = -4 * Math.atan(freq / Math.max(1, state.cutoff));
-          }
-        }
-
-        const topPad = 32;
-        const bottomPad = 22;
-        const plotH = h - topPad - bottomPad;
-
-        // Draw Grid
-        ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
-        ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
-        ctx.font = '12px sans-serif';
-        ctx.lineWidth = 1;
-
-        const fTicks = [1000, 2000, 3000, 4000, 5000, 6000, 7000];
-        fTicks.forEach(f => {
-          const x = (f / (FS / 2)) * w;
-          ctx.beginPath(); ctx.moveTo(x, topPad); ctx.lineTo(x, h - bottomPad); ctx.stroke();
-          ctx.fillText(f + 'Hz', x - 18, h - 4);
-        });
-
-        if (academicChartMode === 'bode') {
-          // 0 dB reference line
-          const y0dB = topPad + (1 - (0 - (-60)) / 65) * plotH;
-          ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)';
-          ctx.setLineDash([3, 3]);
-          ctx.beginPath(); ctx.moveTo(0, y0dB); ctx.lineTo(w, y0dB); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
-          ctx.fillText('0 dB', w - 34, y0dB - 4);
-
-          // Plot Bode Magnitude |H(w)|
-          ctx.strokeStyle = '#a855f7';
-          ctx.lineWidth = 2.4;
-          ctx.beginPath();
-          for (let i = 0; i < bins; i++) {
-            const x = (i / (bins - 1)) * w;
-            const clamped = Math.max(-60, Math.min(5, mags[i]));
-            const y = topPad + (1 - (clamped - (-60)) / 65) * plotH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-
-          // Title text placed cleanly above curve
-          ctx.fillStyle = '#a855f7';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText('|H(ω)| Response dB (Filter Profile Murni)', 12, 20);
-        } else {
-          // Plot Phase Response
-          ctx.strokeStyle = (state.filterArch === 'FIR') ? '#10b981' : '#f59e0b';
-          ctx.lineWidth = 2.4;
-          ctx.beginPath();
-          for (let i = 0; i < bins; i++) {
-            const x = (i / (bins - 1)) * w;
-            const p = phases[i] % (2 * Math.PI);
-            const y = topPad + (0.08 + (p / (-2 * Math.PI)) * 0.84) * plotH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-
-          ctx.fillStyle = (state.filterArch === 'FIR') ? '#10b981' : '#f59e0b';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText((state.filterArch === 'FIR') ? '∠H(ω) Respon Fasa Linear (Garis Lurus FIR - Bebas Distorsi)' : '∠H(ω) Respon Fasa Non-Linear (Phase Dispersion IIR)', 12, 20);
-        }
-
-      } else if (academicChartMode === 'zplane') {
-        // Draw Z-Plane (Unit Circle & Poles/Zeros)
-        const midX = w / 2, midY = h / 2;
-        const R = Math.min(w, h) * 0.38;
-
-        // Axes
-        ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(midX - R * 1.3, midY); ctx.lineTo(midX + R * 1.3, midY);
-        ctx.moveTo(midX, midY - R * 1.2); ctx.lineTo(midX, midY + R * 1.2);
-        ctx.stroke();
-
-        // Unit Circle |z| = 1
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 1.8;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.arc(midX, midY, R, 0, 2 * Math.PI);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = '#3b82f6';
-        ctx.font = '12px sans-serif';
-        ctx.fillText('Lingkaran Satuan (|z| = 1)', midX + R + 8, midY - 6);
-        ctx.fillText('Re(z)', midX + R * 1.2, midY + 16);
-        ctx.fillText('Im(z)', midX + 8, midY - R * 1.1);
-
-        if (state.filterArch === 'FIR') {
-          // FIR: All poles at origin z = 0
-          ctx.strokeStyle = '#ef4444';
-          ctx.lineWidth = 2.5;
-          const px = midX, py = midY;
-          ctx.beginPath();
-          ctx.moveTo(px - 7, py - 7); ctx.lineTo(px + 7, py + 7);
-          ctx.moveTo(px - 7, py + 7); ctx.lineTo(px + 7, py - 7);
-          ctx.stroke();
-
-          ctx.fillStyle = '#ef4444';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText(`M-1 (${state.taps - 1}) Poles di z = 0 (Pasti Stabil)`, midX + 14, midY + 16);
-
-        } else {
-          // IIR: 4 poles inside unit circle (Butterworth poles at r < 1)
-          const poleAngles = [Math.PI * 0.6, Math.PI * 0.8, -Math.PI * 0.6, -Math.PI * 0.8];
-          const r = R * 0.75; // strictly inside unit circle!
-
-          poleAngles.forEach(ang => {
-            const px = midX + r * Math.cos(ang);
-            const py = midY - r * Math.sin(ang);
-            ctx.strokeStyle = '#ef4444';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.moveTo(px - 6, py - 6); ctx.lineTo(px + 6, py + 6);
-            ctx.moveTo(px - 6, py + 6); ctx.lineTo(px + 6, py - 6);
-            ctx.stroke();
-          });
-
-          ctx.fillStyle = '#10b981';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText('4 Poles di dalam |z| < 1 (Sistem Stabil)', midX - R * 1.1, midY - R * 0.9);
-        }
-      }
-    }
-
-    // --- AUDIO PLAYBACK CONTROLLER ---
-    function startPlayingTrack(type, floatArray, label) {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: FS });
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      if (activeSource) {
-        try { activeSource.stop(); } catch(e) {}
-      }
-
-      currentAuditionTrack = type;
-      isPlaying = true;
-      playStartTime = audioCtx.currentTime;
-
-      [btnPlayClean, btnPlayNoisy, btnPlayFiltered].forEach(b => b.classList.remove('ring-4', 'ring-blue-500/50', 'scale-105'));
-      if (type === 'clean') btnPlayClean.classList.add('ring-4', 'ring-emerald-500/50', 'scale-105');
-      if (type === 'noisy') btnPlayNoisy.classList.add('ring-4', 'ring-red-500/50', 'scale-105');
-      if (type === 'filtered') btnPlayFiltered.classList.add('ring-4', 'ring-blue-500/50', 'scale-105');
-
-      metricPlayStatus.textContent = "Status: ▶ " + label;
-      metricPlayStatus.className = "text-blue-500 font-bold animate-pulse";
-
-      const buffer = audioCtx.createBuffer(1, floatArray.length, FS);
-      const channelData = buffer.getChannelData(0);
-      for (let i = 0; i < floatArray.length; i++) {
-        channelData[i] = Math.max(-0.95, Math.min(0.95, floatArray[i]));
-      }
-
-      const source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.loop = loopEnabled;
-      source.connect(audioCtx.destination);
-      source.start(0);
-      activeSource = source;
-
-      source.onended = () => {
-        if (!loopEnabled) stopAudio();
-      };
-    }
-
-    function stopAudio() {
-      if (activeSource) {
-        try { activeSource.stop(); } catch(e) {}
-        activeSource = null;
-      }
-      isPlaying = false;
-      currentAuditionTrack = null;
-      [btnPlayClean, btnPlayNoisy, btnPlayFiltered].forEach(b => b.classList.remove('ring-4', 'ring-blue-500/50', 'ring-emerald-500/50', 'ring-red-500/50', 'scale-105'));
-      metricPlayStatus.textContent = "Status: ⏹ Berhenti";
-      metricPlayStatus.className = "text-[var(--muted-foreground)]";
-    }
-
-    btnPlayClean.addEventListener('click', () => {
-      startPlayingTrack('clean', cleanBuffer, "Sinyal Asli (Clean)");
-    });
-    btnPlayNoisy.addEventListener('click', () => {
-      startPlayingTrack('noisy', noisyBuffer, "Sinyal + Noise (Bising)");
-    });
-    btnPlayFiltered.addEventListener('click', () => {
-      startPlayingTrack('filtered', filteredBuffer, "Hasil Filter (Bersih)");
-    });
-    btnStopAudio.addEventListener('click', stopAudio);
-
-    // --- EXPORT 16-BIT WAV UTILITY ---
-    function encodeWAV(samples, sampleRate) {
-      const buffer = new ArrayBuffer(44 + samples.length * 2);
-      const view = new DataView(buffer);
-
-      function writeString(offset, string) {
-        for (let i = 0; i < string.length; i++) {
-          view.setUint8(offset + i, string.charCodeAt(i));
-        }
-      }
-
-      writeString(0, 'RIFF');
-      view.setUint32(4, 36 + samples.length * 2, true);
-      writeString(8, 'WAVE');
-      writeString(12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM
-      view.setUint16(22, 1, true); // Mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true); // Byte rate
-      view.setUint16(32, 2, true); // Block align
-      view.setUint16(34, 16, true); // 16-bit
-      writeString(36, 'data');
-      view.setUint32(40, samples.length * 2, true);
-
-      let offset = 44;
-      for (let i = 0; i < samples.length; i++, offset += 2) {
-        const s = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      }
-      return new Blob([view], { type: 'audio/wav' });
-    }
-
-    btnDownloadWAV.addEventListener('click', () => {
-      const wavBlob = encodeWAV(filteredBuffer, FS);
-      const url = URL.createObjectURL(wavBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `audio_terfilter_${state.filterArch}_${state.filterMode}.wav`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    // --- EXPORT PNG SCREENSHOT UTILITY ---
-    btnDownloadPNG.addEventListener('click', () => {
-      // Create a combined high-res canvas for academic report
-      const exportCanvas = document.createElement('canvas');
-      exportCanvas.width = 1200;
-      exportCanvas.height = 1000;
-      const expCtx = exportCanvas.getContext('2d');
-
-      expCtx.fillStyle = '#ffffff';
-      expCtx.fillRect(0, 0, 1200, 1000);
-
-      expCtx.fillStyle = '#0f172a';
-      expCtx.font = 'bold 22px sans-serif';
-      expCtx.fillText(`Grafik Hasil Simulasi PSD: Filter ${state.filterArch} (${state.filterMode.toUpperCase()})`, 30, 40);
-      expCtx.font = '14px sans-serif';
-      expCtx.fillStyle = '#64748b';
-      expCtx.fillText(`SNR Improvement: ${metricSnrGain.textContent} dB | Sampling Rate: ${FS} Hz | Cutoff: ${state.cutoff} Hz`, 30, 68);
-
-      // Draw Time Canvas
-      expCtx.drawImage(canvasTime, 30, 90, 1140, 260);
-      // Draw Frequency Canvas
-      expCtx.drawImage(canvasFreq, 30, 370, 1140, 280);
-      // Draw Academic Canvas
-      expCtx.drawImage(canvasAcademic, 30, 670, 1140, 300);
-
-      const a = document.createElement('a');
-      a.href = exportCanvas.toDataURL('image/png');
-      a.download = `grafik_simulasi_psd_${state.filterArch}.png`;
-      a.click();
-    });
-
-    window.addEventListener('resize', () => onParamChanged());
-
-    // Init
-    generateBaseSynth();
-    updateNoiseUI();
-    onParamChanged();
-    setAcademicTab('bode');
-  </script>
+        const decoded = await ac.decodeAudioData(await new Blob(chunks).arrayBuffer());
+        useRecorded(decoded, 'mic');
+        $('micNote').className = 'note ok'; $('micNote').textContent = '✓ Rekaman 3 detik siap. Putar "3. Filter" lalu geser cutoff.';
+      } catch (e) { alert('Gagal membaca rekaman: ' + e.message); }
+      btn.disabled = false; btn.textContent = '🔴 REKAM ULANG (3 DETIK)';
+    };
+    rec.start();
+    setTimeout(() => rec.state === 'recording' && rec.stop(), 3000);
+  } catch (err) {
+    alert('Gagal mengakses mikrofon: ' + err.message);
+    btn.disabled = false; btn.textContent = '🔴 REKAM SUARA SAYA (3 DETIK)';
+  }
+});
+$('inputFile').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  $('fileLabel').textContent = `Memuat ${file.name}…`;
+  try {
+    const decoded = await ctxAudio().decodeAudioData(await file.arrayBuffer());
+    useRecorded(decoded, 'file');
+    $('fileLabel').textContent = `✓ ${file.name} (${fmt(decoded.duration, 1)} s, dipakai 3 detik pertama)`;
+  } catch (err) { alert('Gagal membaca file audio: ' + err.message); $('fileLabel').textContent = 'Gagal memuat file.'; }
+});
+
+// =====================================================================
+//  EVENT KONTROL
+// =====================================================================
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { Object.assign(state, PRESETS[b.dataset.preset]); update(); }));
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+  state.mode = b.dataset.mode;
+  const p = { bandpass: 'voice', lowpass: 'hiss', highpass: 'hum' }[state.mode];
+  Object.assign(state, PRESETS[p]);           // mode baru mulai dari nilai preset-nya
+  update();
+}));
+document.querySelectorAll('[data-arch]').forEach(b => b.addEventListener('click', () => { state.arch = b.dataset.arch; update(); }));
+document.querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => {
+  state.source = b.dataset.src;
+  // Rekaman asli sudah punya noise alami → noise buatan dimatikan.
+  // Sintetis (atau mic/file yang belum direkam) → noise buatan dinyalakan agar efek filter terlihat.
+  state.noiseOn = !(state.source !== 'synth' && recorded[state.source]);
+  loadSourceBuffer(); update();
+}));
+document.querySelectorAll('#tabsAcad [data-view]').forEach(b => b.addEventListener('click', () => { state.view = b.dataset.view; renderUI(); drawAcad(); }));
+document.querySelectorAll('[data-track]').forEach(b => b.addEventListener('click', () => play(b.dataset.track)));
+$('btnStop').addEventListener('click', stopAudio);
+$('chkLoop').addEventListener('change', e => { if (activeSrc) activeSrc.loop = e.target.checked; });
+$('selSynth').addEventListener('change', e => { state.synth = e.target.value; loadSourceBuffer(); update(); });
+$('chkNoise').addEventListener('change', e => { state.noiseOn = e.target.checked; update(); });
+$('selNoise').addEventListener('change', e => { state.noiseType = e.target.value; update(); });
+$('sliderNoise').addEventListener('input', e => { state.noiseAmp = +e.target.value; $('noiseAmpLbl').textContent = fmt(state.noiseAmp, 2); update(); });
+$('sliderFc').addEventListener('input', e => { state.fc = +e.target.value; update(); });
+$('sliderLow').addEventListener('input', e => { state.fLow = Math.min(+e.target.value, state.fHigh - 200); update(); });
+$('sliderHigh').addEventListener('input', e => { state.fHigh = Math.max(+e.target.value, state.fLow + 200); update(); });
+$('sliderTaps').addEventListener('input', e => { state.taps = +e.target.value; update(); });
+$('btnSweet').addEventListener('click', () => { if (sweep) { state[sweep.ax.key] = sweep.best.v; update(); } });
+
+// Tema, layar penuh, ekspor
+function setTheme(t) { document.documentElement.dataset.theme = t; localStorage.setItem('psd-theme', t); drawAll(); }
+$('btnTheme').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+$('btnFull').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); });
+$('btnWAV').addEventListener('click', () => {
+  const buf = new ArrayBuffer(44 + N * 2), v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, 36 + N * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, FS, true); v.setUint32(28, FS * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  ws(36, 'data'); v.setUint32(40, N * 2, true);
+  for (let i = 0; i < N; i++) { const s = Math.max(-1, Math.min(1, filtered[i])); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true); }
+  download(new Blob([v], { type: 'audio/wav' }), `audio_terfilter_${state.arch}_${state.mode}.wav`);
+});
+$('btnPNG').addEventListener('click', () => {
+  const ids = ['cvTime', 'cvFFT', 'cvAcad'];
+  const W = 1200, H = 1060, out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const c = out.getContext('2d');
+  c.fillStyle = css('--card'); c.fillRect(0, 0, W, H);
+  c.fillStyle = css('--fg'); c.font = 'bold 22px system-ui, sans-serif';
+  c.fillText(`Hasil Simulasi PSD: Filter ${state.arch} ${state.mode.toUpperCase()} (${passbandText()[0]})`, 30, 42);
+  c.font = '14px system-ui, sans-serif'; c.fillStyle = css('--muted');
+  c.fillText(`ΔSNR: ${$('mSnr').textContent} · Fs = 16.000 Hz · ${state.arch === 'FIR' ? state.taps + ' taps' : iirName()}`, 30, 68);
+  const titles = ['Domain waktu', 'Spektrum FFT', $('tabsAcad').querySelector('.on').textContent];
+  ids.forEach((id, i) => {
+    const y = 90 + i * 320;
+    c.fillStyle = css('--fg'); c.font = '600 14px system-ui, sans-serif'; c.fillText(titles[i], 30, y + 4);
+    c.drawImage($(id), 30, y + 14, 1140, 290);
+  });
+  out.toBlob(b => download(b, `grafik_simulasi_psd_${state.arch}_${state.mode}.png`));
+});
+function download(blob, name) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Pintasan keyboard
+document.addEventListener('keydown', e => {
+  const t = e.target.tagName;
+  if (t === 'INPUT' && e.target.type !== 'range' || t === 'SELECT' || t === 'TEXTAREA') return;
+  if (e.code === 'Space') { e.preventDefault(); isPlaying ? stopAudio() : play('filtered'); }
+  else if (e.key === 'f' || e.key === 'F') { state.arch = state.arch === 'FIR' ? 'IIR' : 'FIR'; update(); }
+});
+
+let resizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(drawAll, 120); });
+
+// =====================================================================
+//  INISIALISASI
+// =====================================================================
+document.documentElement.dataset.theme = localStorage.getItem('psd-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+buildNoise();
+loadSourceBuffer();
+recompute();
+renderUI();
+drawAll();
+computeSweep(); drawSweep();
+</script>
 </body>
 </html>

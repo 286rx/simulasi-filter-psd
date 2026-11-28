@@ -9,7 +9,7 @@ Dokumen ini memuat seluruh data penting proyek: tautan publik (*live links*), re
 
 | Layanan | Tautan / URL | Keterangan |
 |:---|:---|:---|
-| **🌐 Web Simulasi (Live Demo)** | [https://286rx.github.io/simulasi-filter-psd/](https://286rx.github.io/simulasi-filter-psd/) | Link utama yang bisa dibagikan ke dosen, asisten lab, dan teman. Bisa dibuka langsung dari browser laptop atau HP. |
+| **🌐 Web Simulasi (Live Demo)** | [https://simulasipsd.netlify.app/](https://simulasipsd.netlify.app/) (GitHub Pages `286rx.github.io/simulasi-filter-psd` belum aktif) | Link utama yang bisa dibagikan ke dosen, asisten lab, dan teman. Bisa dibuka langsung dari browser laptop atau HP. |
 | **🐙 Repositori GitHub** | [https://github.com/286rx/simulasi-filter-psd](https://github.com/286rx/simulasi-filter-psd) | Halaman kode sumber publik, dokumentasi `README.md`, dan riwayat commit. |
 | **📦 Remote Git Origin** | `https://github.com/286rx/simulasi-filter-psd.git` | Alamat remote HTTPS untuk perintah `git push` dan `git pull`. |
 | **🚀 Opsi Cadangan (Netlify)** | [https://app.netlify.com/drop](https://app.netlify.com/drop) | Untuk deploy instan tanpa git (tinggal drag-and-drop folder proyek). |
@@ -19,7 +19,7 @@ Dokumen ini memuat seluruh data penting proyek: tautan publik (*live links*), re
 ## 💻 Lokasi Penyimpanan di Komputer Lokal (Laptop)
 
 * **Path Folder Proyek:**
-  `C:\Users\ocit\.gemini\antigravity\scratch\proyek-simulasi-psd`
+  `C:\Users\ocit\OneDrive\Documents\Tugas PSD - Simulasi Filter`
 * **Branch Git Utama:**
   `main`
 * **Akun Pemilik Git:**
@@ -30,7 +30,7 @@ Dokumen ini memuat seluruh data penting proyek: tautan publik (*live links*), re
 ## 📁 Struktur & Penjelasan Fungsi File
 
 ```text
-proyek-simulasi-psd/
+Tugas PSD - Simulasi Filter/
 │
 ├── 🌐 FILE WEB SIMULASI
 │   ├── index.html                   # File web utama yang dibaca otomatis oleh GitHub Pages (root)
@@ -56,7 +56,7 @@ proyek-simulasi-psd/
 
 Buka terminal (PowerShell / Command Prompt / Git Bash) di folder proyek:
 ```bash
-cd "C:\Users\ocit\.gemini\antigravity\scratch\proyek-simulasi-psd"
+cd "C:\Users\ocit\OneDrive\Documents\Tugas PSD - Simulasi Filter"
 ```
 
 ### 1. Mengecek Status Perubahan
@@ -96,8 +96,8 @@ git pull --rebase origin main
 ## 🎯 Panduan Singkat Cara Akses / Presentasi
 
 1. **Buka di Browser untuk Presentasi:**
-   Buka link: **[https://286rx.github.io/simulasi-filter-psd/](https://286rx.github.io/simulasi-filter-psd/)**
+   Buka link: **[https://simulasipsd.netlify.app/](https://simulasipsd.netlify.app/)**
 2. **Cadangan Tanpa Kuota / Offline:**
-   Buka file lokal dengan double-click: [simulasi_filter_audio.html](file:///C:/Users/ocit/.gemini/antigravity/scratch/proyek-simulasi-psd/simulasi_filter_audio.html)
+   Buka file lokal dengan double-click: [simulasi_filter_audio.html](file:///C:/Users/ocit/OneDrive/Documents/Tugas%20PSD%20-%20Simulasi%20Filter/simulasi_filter_audio.html)
 3. **Membaca Contekan Q&A Sebelum Ujian:**
-   Buka file PDF privat di laptop: [panduan_dan_20_tanya_jawab_psd.pdf](file:///C:/Users/ocit/.gemini/antigravity/scratch/proyek-simulasi-psd/panduan_dan_20_tanya_jawab_psd.pdf)
+   Buka file PDF privat di laptop: [panduan_dan_20_tanya_jawab_psd.pdf](file:///C:/Users/ocit/OneDrive/Documents/Tugas%20PSD%20-%20Simulasi%20Filter/panduan_dan_20_tanya_jawab_psd.pdf)
